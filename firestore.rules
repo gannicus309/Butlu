@@ -60,6 +60,10 @@ service cloud.firestore {
       match /events/{eventId} {
         allow read, write: if isFamilyMember(familyId);
       }
+
+      match /groceryItems/{itemId} {
+        allow read, write: if isFamilyMember(familyId);
+      }
     }
   }
 }

@@ -5,7 +5,7 @@ import '../features/account/screens/account_screen.dart';
 import '../features/calendar/screens/day_detail_screen.dart';
 import '../features/calendar/screens/month_view_screen.dart';
 import '../features/chores/screens/placeholder_screen.dart' as chores;
-import '../features/grocery/screens/placeholder_screen.dart' as grocery;
+import '../features/grocery/screens/grocery_screen.dart';
 import '../features/more/screens/placeholder_screen.dart' as more;
 import '../features/vault/screens/placeholder_screen.dart' as vault;
 
@@ -44,7 +44,7 @@ final GoRouter appRouter = GoRouter(
           routes: [
             GoRoute(
               path: '/grocery',
-              builder: (context, state) => const grocery.PlaceholderScreen(),
+              builder: (context, state) => const GroceryScreen(),
             ),
           ],
         ),
