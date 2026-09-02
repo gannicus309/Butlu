@@ -1,10 +1,25 @@
 rules_version = '2';
 
-// Applied via `firebase deploy --only firestore:rules` once the Firebase
-// project exists (Milestone 2). Authorization model: every family member's
-// Firebase Auth uid is listed in /families/{familyId}.memberUids, and every
-// read/write to that family's data checks membership against it -- this is
-// what makes the shared space secure without a custom backend.
+// Applied via `firebase deploy --only firestore:rules`. Authorization model:
+// every family member's Firebase Auth uid is listed in
+// /families/{familyId}.memberUids, and every read/write to that family's data
+// checks membership against it -- this is what makes the shared space secure
+// without a custom backend.
+//
+// Joining: a family the caller isn't a member of yet is only visible/joinable
+// if their *verified* Google account email (request.auth.token.email, from
+// the Firebase Auth ID token) is on that family's `invitedEmails` list, set
+// by whoever created the family. This also doubles as how a spouse's client
+// discovers the family to join in the first place -- querying
+// `families.where('invitedEmails', arrayContains: myEmail)` only returns
+// documents this rule already allows them to read, so no separate lookup
+// mechanism is needed.
+//
+// Rules on /families/{familyId} itself read straight off `resource.data` --
+// that's already the exact document being evaluated (including per-document
+// for a `list` query), so no self-referential get() is needed there. The
+// nested /members and /events collections are the ones that actually need
+// get() to look up their *parent* family doc.
 service cloud.firestore {
   match /databases/{database}/documents {
     function isFamilyMember(familyId) {
@@ -13,13 +28,29 @@ service cloud.firestore {
     }
 
     match /families/{familyId} {
-      allow read: if isFamilyMember(familyId);
-      // Creation is allowed for any signed-in user (they become the first
-      // member); membership changes/joins are handled by a validated update,
-      // not opened up to arbitrary writes.
+      allow read: if request.auth != null &&
+        (request.auth.uid in resource.data.memberUids ||
+         request.auth.token.email in resource.data.invitedEmails);
+
       allow create: if request.auth != null &&
-        request.resource.data.memberUids == [request.auth.uid];
-      allow update, delete: if isFamilyMember(familyId);
+        request.resource.data.memberUids == [request.auth.uid] &&
+        request.auth.token.email in request.resource.data.invitedEmails;
+
+      // Existing members can update anything. A non-member may only append
+      // their own uid to memberUids (accepting an invite) -- nothing else
+      // may change in that case.
+      allow update: if request.auth != null &&
+        (
+          request.auth.uid in resource.data.memberUids ||
+          (
+            request.auth.token.email in resource.data.invitedEmails &&
+            !(request.auth.uid in resource.data.memberUids) &&
+            request.resource.data.memberUids == resource.data.memberUids + [request.auth.uid] &&
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['memberUids'])
+          )
+        );
+
+      allow delete: if request.auth != null && request.auth.uid in resource.data.memberUids;
 
       match /members/{uid} {
         allow read: if isFamilyMember(familyId);

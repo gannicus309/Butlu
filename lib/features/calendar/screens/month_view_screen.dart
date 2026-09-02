@@ -4,23 +4,61 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:table_calendar/table_calendar.dart';
 
+import '../../../shared/widgets/account_avatar_button.dart';
 import '../providers/calendar_providers.dart';
 import '../widgets/event_dot_marker.dart';
 
-class MonthViewScreen extends ConsumerWidget {
+class MonthViewScreen extends ConsumerStatefulWidget {
   const MonthViewScreen({super.key});
+
+  @override
+  ConsumerState<MonthViewScreen> createState() => _MonthViewScreenState();
+}
+
+class _MonthViewScreenState extends ConsumerState<MonthViewScreen> {
+  bool _syncing = false;
 
   bool _isSameDay(DateTime a, DateTime b) =>
       a.year == b.year && a.month == b.month && a.day == b.day;
 
+  Future<void> _syncNow() async {
+    setState(() => _syncing = true);
+    try {
+      await ref.read(calendarSyncServiceProvider).runFullSync();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Sync failed: $e')));
+      }
+    } finally {
+      if (mounted) setState(() => _syncing = false);
+    }
+  }
+
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final focusedMonth = ref.watch(focusedMonthProvider);
     final selectedDay = ref.watch(selectedDayProvider);
     final eventsByDay = ref.watch(eventsByDayProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Calendar')),
+      appBar: AppBar(
+        title: const Text('Calendar'),
+        actions: [
+          IconButton(
+            onPressed: _syncing ? null : _syncNow,
+            icon: _syncing
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.sync),
+            tooltip: 'Sync with iOS Calendar',
+          ),
+          const AccountAvatarButton(),
+        ],
+      ),
       body: Column(
         children: [
           TableCalendar(

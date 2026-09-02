@@ -1,12 +1,17 @@
 import 'package:flutter/material.dart';
 
+import '../../../shared/widgets/account_avatar_button.dart';
+
 class PlaceholderScreen extends StatelessWidget {
   const PlaceholderScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('More')),
+      appBar: AppBar(
+        title: const Text('More'),
+        actions: const [AccountAvatarButton()],
+      ),
       body: ListView(
         children: const [
           ListTile(

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../features/account/screens/account_screen.dart';
 import '../features/calendar/screens/day_detail_screen.dart';
 import '../features/calendar/screens/month_view_screen.dart';
 import '../features/chores/screens/placeholder_screen.dart' as chores;
@@ -8,9 +9,17 @@ import '../features/grocery/screens/placeholder_screen.dart' as grocery;
 import '../features/more/screens/placeholder_screen.dart' as more;
 import '../features/vault/screens/placeholder_screen.dart' as vault;
 
+final GlobalKey<NavigatorState> _rootNavigatorKey = GlobalKey<NavigatorState>();
+
 final GoRouter appRouter = GoRouter(
+  navigatorKey: _rootNavigatorKey,
   initialLocation: '/calendar',
   routes: [
+    GoRoute(
+      path: '/account',
+      parentNavigatorKey: _rootNavigatorKey,
+      builder: (context, state) => const AccountScreen(),
+    ),
     StatefulShellRoute.indexedStack(
       builder: (context, state, navigationShell) =>
           _AppShell(navigationShell: navigationShell),

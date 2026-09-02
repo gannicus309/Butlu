@@ -21,13 +21,20 @@ import '../models/event_source.dart';
 class CalendarSyncService {
   final FirestoreEventRepository firestore;
   final IosCalendarRepository ios;
-  final OutlookCalendarRepository outlook;
+  final OutlookCalendarRepository? outlook;
   final DateTime Function() _now;
 
+  /// [outlook] is nullable: direct Microsoft Graph access needs an Azure AD
+  /// app registration, which isn't available on every tenant (e.g. a
+  /// corporate-managed Microsoft 365 account may block self-service app
+  /// registration). When null, Outlook simply isn't a sync target -- a user
+  /// can still get their Outlook events into Butlu by adding their account as
+  /// a native iOS Exchange calendar, which then arrives through [ios] like
+  /// any other EventKit calendar.
   CalendarSyncService({
     required this.firestore,
     required this.ios,
-    required this.outlook,
+    this.outlook,
     DateTime Function()? now,
   }) : _now = now ?? DateTime.now;
 
@@ -39,7 +46,7 @@ class CalendarSyncService {
     final end = _now().add(_windowFuture);
 
     final iosEvents = await ios.fetchWindow(start, end);
-    final outlookEvents = await outlook.fetchWindow(start, end);
+    final outlookEvents = await outlook?.fetchWindow(start, end) ?? const [];
 
     for (final event in [...iosEvents, ...outlookEvents]) {
       await _ingestExternalEvent(event);
@@ -61,6 +68,17 @@ class CalendarSyncService {
       await firestore.upsert(incoming);
       return;
     }
+
+    // EventKit (via device_calendar_plus) exposes no last-modified timestamp,
+    // so the iOS repository stamps every fetch with the current sync time --
+    // meaning "is incoming newer" is nearly always true for iOS and would
+    // stomp a pending Firestore-side edit on every single sync otherwise.
+    // Skipping when the content hasn't actually changed sidesteps that for
+    // the common case (nothing changed since last sync); it does not fully
+    // solve the rarer case of both sides editing the same event between two
+    // syncs, which is a real, documented limitation of the plugin, not of
+    // this engine.
+    if (_hasSameContent(incoming, existing)) return;
 
     if (!incoming.lastModifiedAt.isAfter(existing.lastModifiedAt)) {
       // Firestore's copy is newer -- a local edit (via Butlu, or the other
@@ -90,6 +108,15 @@ class CalendarSyncService {
     await firestore.upsert(merged);
   }
 
+  bool _hasSameContent(CalendarEvent a, CalendarEvent b) {
+    return a.title == b.title &&
+        a.notes == b.notes &&
+        a.startAt == b.startAt &&
+        a.endAt == b.endAt &&
+        a.isAllDay == b.isAllDay &&
+        a.timeZone == b.timeZone;
+  }
+
   Future<void> _pushPendingButluChanges() async {
     final all = await firestore.fetchAll();
     for (final event in all) {
@@ -99,7 +126,10 @@ class CalendarSyncService {
 
       var updated = event;
       updated = await _pushToTarget(updated, ios, updated.iosRef);
-      updated = await _pushToTarget(updated, outlook, updated.outlookRef);
+      final outlookTarget = outlook;
+      if (outlookTarget != null) {
+        updated = await _pushToTarget(updated, outlookTarget, updated.outlookRef);
+      }
       if (!identical(updated, event)) {
         await firestore.upsert(updated);
       }

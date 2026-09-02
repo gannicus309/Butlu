@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "552503667814",
+    "project_id": "butlu-cb898",
+    "storage_bucket": "butlu-cb898.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:552503667814:android:bb90f6d69511533232d1a7",
+        "android_client_info": {
+          "package_name": "com.butlu.butlu"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC8v-7gAvjC4y3NIyCsIfBx7TcQ0HeGLU8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

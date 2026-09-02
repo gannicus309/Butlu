@@ -190,6 +190,39 @@ void main() {
     expect(firestore.store['doc-1']!.title, 'New title');
   });
 
+  test(
+    'an unchanged external pull is a no-op even when its timestamp is newer',
+    () async {
+      // Simulates device_calendar_plus, which stamps every iOS fetch with
+      // "now" (no real last-modified field exists on that platform) -- a
+      // newer timestamp alone must not be enough to trigger an overwrite.
+      firestore.store['doc-1'] = _event(
+        id: 'doc-1',
+        title: 'Dentist',
+        source: EventSource.ios,
+        lastModifiedBy: EventSource.butlu,
+        lastModifiedAt: DateTime.utc(2026, 8, 1),
+        iosRef: const ExternalRef(eventIdentifier: 'ios-1'),
+      );
+      ios.windowResult = [
+        _event(
+          id: 'doc-1',
+          title: 'Dentist',
+          source: EventSource.ios,
+          lastModifiedBy: EventSource.ios,
+          lastModifiedAt: DateTime.utc(2026, 9, 1),
+          iosRef: const ExternalRef(eventIdentifier: 'ios-1'),
+        ),
+      ];
+
+      await sync.runFullSync();
+
+      final stored = firestore.store['doc-1']!;
+      expect(stored.lastModifiedBy, EventSource.butlu);
+      expect(stored.lastModifiedAt, DateTime.utc(2026, 8, 1));
+    },
+  );
+
   test('stale external pull does not overwrite a newer local edit', () async {
     firestore.store['doc-1'] = _event(
       id: 'doc-1',
