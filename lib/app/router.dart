@@ -2,11 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../features/account/screens/account_screen.dart';
+import '../features/bills/screens/bills_screen.dart';
 import '../features/calendar/screens/day_detail_screen.dart';
 import '../features/calendar/screens/month_view_screen.dart';
 import '../features/chores/screens/chores_screen.dart';
+import '../features/gemini/screens/gemini_chat_screen.dart';
 import '../features/grocery/screens/grocery_screen.dart';
-import '../features/more/screens/placeholder_screen.dart' as more;
+import '../features/meals/screens/meal_plan_screen.dart';
+import '../features/more/screens/more_screen.dart';
+import '../features/pickup/screens/pickup_screen.dart';
 import '../features/vault/screens/note_edit_screen.dart';
 import '../features/vault/screens/vault_screen.dart';
 
@@ -81,7 +85,25 @@ final GoRouter appRouter = GoRouter(
           routes: [
             GoRoute(
               path: '/more',
-              builder: (context, state) => const more.PlaceholderScreen(),
+              builder: (context, state) => const MoreScreen(),
+              routes: [
+                GoRoute(
+                  path: 'bills',
+                  builder: (context, state) => const BillsScreen(),
+                ),
+                GoRoute(
+                  path: 'pickup',
+                  builder: (context, state) => const PickupScreen(),
+                ),
+                GoRoute(
+                  path: 'meals',
+                  builder: (context, state) => const MealPlanScreen(),
+                ),
+                GoRoute(
+                  path: 'gemini',
+                  builder: (context, state) => const GeminiChatScreen(),
+                ),
+              ],
             ),
           ],
         ),

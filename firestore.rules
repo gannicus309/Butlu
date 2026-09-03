@@ -72,6 +72,21 @@ service cloud.firestore {
       match /vaultNotes/{noteId} {
         allow read, write: if isFamilyMember(familyId);
       }
+
+      match /bills/{billId} {
+        allow read, write: if isFamilyMember(familyId);
+      }
+
+      match /mealPlan/{dayKey} {
+        allow read, write: if isFamilyMember(familyId);
+      }
+
+      // Same shape as /members/{uid}: everyone in the family can see
+      // everyone's status, but you can only set your own.
+      match /status/{uid} {
+        allow read: if isFamilyMember(familyId);
+        allow write: if isFamilyMember(familyId) && request.auth.uid == uid;
+      }
     }
   }
 }

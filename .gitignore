@@ -46,3 +46,6 @@ app.*.map.json
 
 # Widget Preview related
 .widget_preview/
+
+# API keys passed via --dart-define-from-file -- see dart_define.example.json
+dart_define.json
