@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
+import '../../../shared/widgets/empty_state.dart';
+import '../../../shared/widgets/fade_slide_in.dart';
 import '../../auth/providers/auth_providers.dart' show authStateProvider;
 import '../providers/bill_providers.dart';
 
@@ -107,11 +109,9 @@ class BillsScreen extends ConsumerWidget {
       body: billsAsync.when(
         data: (bills) {
           if (bills.isEmpty) {
-            return Center(
-              child: Text(
-                'No bills tracked yet',
-                style: Theme.of(context).textTheme.bodyMedium,
-              ),
+            return const EmptyState(
+              icon: Icons.receipt_long_outlined,
+              message: 'No bills tracked yet',
             );
           }
           return ListView.separated(
@@ -120,28 +120,31 @@ class BillsScreen extends ConsumerWidget {
             itemBuilder: (context, index) {
               final bill = bills[index];
               final daysLeft = bill.daysUntilDue();
-              return ListTile(
-                title: Text(bill.name),
-                subtitle: Text(
-                  _dueLabel(daysLeft),
-                  style: TextStyle(color: _dueColor(context, daysLeft)),
-                ),
-                trailing: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (bill.amount != null)
-                      Text(NumberFormat.simpleCurrency().format(bill.amount)),
-                    if (bill.autoPay)
-                      const Padding(
-                        padding: EdgeInsets.only(left: 8),
-                        child: Icon(Icons.autorenew, size: 18),
+              return FadeSlideIn(
+                delay: FadeSlideIn.staggerDelay(index),
+                child: ListTile(
+                  title: Text(bill.name),
+                  subtitle: Text(
+                    _dueLabel(daysLeft),
+                    style: TextStyle(color: _dueColor(context, daysLeft)),
+                  ),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (bill.amount != null)
+                        Text(NumberFormat.simpleCurrency().format(bill.amount)),
+                      if (bill.autoPay)
+                        const Padding(
+                          padding: EdgeInsets.only(left: 8),
+                          child: Icon(Icons.autorenew, size: 18),
+                        ),
+                      IconButton(
+                        icon: const Icon(Icons.delete_outline),
+                        onPressed: () =>
+                            ref.read(billRepositoryProvider).deleteBill(bill.id),
                       ),
-                    IconButton(
-                      icon: const Icon(Icons.delete_outline),
-                      onPressed: () =>
-                          ref.read(billRepositoryProvider).deleteBill(bill.id),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               );
             },

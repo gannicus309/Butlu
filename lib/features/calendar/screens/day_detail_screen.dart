@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../../shared/widgets/empty_state.dart';
+import '../../../shared/widgets/fade_slide_in.dart';
 import '../../auth/providers/auth_providers.dart' show authStateProvider;
 import '../models/calendar_event.dart';
 import '../models/event_source.dart';
@@ -68,16 +70,17 @@ class DayDetailScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(title: Text(DateFormat.yMMMMEEEEd().format(date))),
       body: events.isEmpty
-          ? Center(
-              child: Text(
-                'No events this day',
-                style: Theme.of(context).textTheme.bodyMedium,
-              ),
+          ? const EmptyState(
+              icon: Icons.event_available_outlined,
+              message: 'No events this day',
             )
           : ListView.separated(
               itemCount: events.length,
               separatorBuilder: (context, index) => const Divider(height: 1),
-              itemBuilder: (context, index) => EventListTile(event: events[index]),
+              itemBuilder: (context, index) => FadeSlideIn(
+                delay: FadeSlideIn.staggerDelay(index),
+                child: EventListTile(event: events[index]),
+              ),
             ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => _addEvent(context, ref),

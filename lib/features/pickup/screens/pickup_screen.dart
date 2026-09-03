@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../shared/widgets/fade_slide_in.dart';
+import '../../../shared/widgets/pressable_scale.dart';
 import '../../auth/providers/auth_providers.dart' show authStateProvider;
 import '../../auth/providers/family_members_provider.dart';
 import '../providers/status_providers.dart';
@@ -61,20 +63,23 @@ class PickupScreen extends ConsumerWidget {
           return ListView(
             padding: const EdgeInsets.all(16),
             children: [
-              for (final entry in members.entries)
-                Card(
-                  child: ListTile(
-                    leading: CircleAvatar(
-                      child: Text(entry.value.isNotEmpty
-                          ? entry.value[0].toUpperCase()
-                          : '?'),
-                    ),
-                    title: Text(entry.value),
-                    subtitle: Text(
-                      statusByUid[entry.key] != null
-                          ? '${statusByUid[entry.key]!.label} · '
-                              '${_relativeTime(statusByUid[entry.key]!.updatedAt)}'
-                          : 'No status set',
+              for (final (index, entry) in members.entries.indexed)
+                FadeSlideIn(
+                  delay: FadeSlideIn.staggerDelay(index),
+                  child: Card(
+                    child: ListTile(
+                      leading: CircleAvatar(
+                        child: Text(entry.value.isNotEmpty
+                            ? entry.value[0].toUpperCase()
+                            : '?'),
+                      ),
+                      title: Text(entry.value),
+                      subtitle: Text(
+                        statusByUid[entry.key] != null
+                            ? '${statusByUid[entry.key]!.label} · '
+                                '${_relativeTime(statusByUid[entry.key]!.updatedAt)}'
+                            : 'No status set',
+                      ),
                     ),
                   ),
                 ),
@@ -89,20 +94,24 @@ class PickupScreen extends ConsumerWidget {
                 runSpacing: 8,
                 children: [
                   for (final preset in statusPresets)
-                    ActionChip(
-                      label: Text(preset),
+                    PressableScale(
+                      child: ActionChip(
+                        label: Text(preset),
+                        onPressed: currentUid == null
+                            ? null
+                            : () => ref
+                                .read(statusRepositoryProvider)
+                                .setStatus(currentUid, preset),
+                      ),
+                    ),
+                  PressableScale(
+                    child: ActionChip(
+                      avatar: const Icon(Icons.edit_outlined, size: 18),
+                      label: const Text('Custom'),
                       onPressed: currentUid == null
                           ? null
-                          : () => ref
-                              .read(statusRepositoryProvider)
-                              .setStatus(currentUid, preset),
+                          : () => _setCustomStatus(context, ref, currentUid),
                     ),
-                  ActionChip(
-                    avatar: const Icon(Icons.edit_outlined, size: 18),
-                    label: const Text('Custom'),
-                    onPressed: currentUid == null
-                        ? null
-                        : () => _setCustomStatus(context, ref, currentUid),
                   ),
                 ],
               ),

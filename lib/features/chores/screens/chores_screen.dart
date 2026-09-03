@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../shared/widgets/account_avatar_button.dart';
+import '../../../shared/widgets/empty_state.dart';
+import '../../../shared/widgets/fade_slide_in.dart';
+import '../../../shared/widgets/pressable_scale.dart';
 import '../../auth/providers/auth_providers.dart' show authStateProvider;
 import '../../auth/providers/family_members_provider.dart';
 import '../models/chore_task.dart';
@@ -85,31 +88,41 @@ class ChoresScreen extends ConsumerWidget {
                 spacing: 8,
                 runSpacing: 8,
                 children: [
-                  for (final task in unclaimed)
-                    ActionChip(
-                      avatar: const Icon(Icons.add_task, size: 18),
-                      label: Text(task.title),
-                      onPressed: currentUid == null
-                          ? null
-                          : () => ref
-                              .read(choreRepositoryProvider)
-                              .claimTask(task.id, currentUid),
-                    ),
-                  for (final suggestion in suggestions)
-                    ActionChip(
-                      avatar: const Icon(Icons.add, size: 18),
-                      label: Text(suggestion),
-                      backgroundColor: Colors.transparent,
-                      side: BorderSide(
-                        color: Theme.of(context).colorScheme.outline,
+                  for (final (index, task) in unclaimed.indexed)
+                    FadeSlideIn(
+                      delay: FadeSlideIn.staggerDelay(index),
+                      child: PressableScale(
+                        child: ActionChip(
+                          avatar: const Icon(Icons.add_task, size: 18),
+                          label: Text(task.title),
+                          onPressed: currentUid == null
+                              ? null
+                              : () => ref
+                                  .read(choreRepositoryProvider)
+                                  .claimTask(task.id, currentUid),
+                        ),
                       ),
-                      onPressed: currentUid == null
-                          ? null
-                          : () => ref.read(choreRepositoryProvider).addTask(
-                                title: suggestion,
-                                createdByUid: currentUid,
-                                assignedToUid: currentUid,
-                              ),
+                    ),
+                  for (final (index, suggestion) in suggestions.indexed)
+                    FadeSlideIn(
+                      delay: FadeSlideIn.staggerDelay(unclaimed.length + index),
+                      child: PressableScale(
+                        child: ActionChip(
+                          avatar: const Icon(Icons.add, size: 18),
+                          label: Text(suggestion),
+                          backgroundColor: Colors.transparent,
+                          side: BorderSide(
+                            color: Theme.of(context).colorScheme.outline,
+                          ),
+                          onPressed: currentUid == null
+                              ? null
+                              : () => ref.read(choreRepositoryProvider).addTask(
+                                    title: suggestion,
+                                    createdByUid: currentUid,
+                                    assignedToUid: currentUid,
+                                  ),
+                        ),
+                      ),
                     ),
                 ],
               ),
@@ -117,9 +130,9 @@ class ChoresScreen extends ConsumerWidget {
               const Divider(height: 1),
               const SizedBox(height: 16),
               if (byAssignee.isEmpty)
-                Text(
-                  'Nothing claimed yet',
-                  style: Theme.of(context).textTheme.bodyMedium,
+                const EmptyState(
+                  icon: Icons.checklist_outlined,
+                  message: 'Nothing claimed yet',
                 )
               else
                 for (final entry in byAssignee.entries) ...[
@@ -127,21 +140,24 @@ class ChoresScreen extends ConsumerWidget {
                     members[entry.key] ?? 'Someone',
                     style: Theme.of(context).textTheme.titleSmall,
                   ),
-                  for (final task in entry.value)
-                    ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: Checkbox(
-                        value: false,
-                        onChanged: (_) => ref
-                            .read(choreRepositoryProvider)
-                            .markDone(task.id),
-                      ),
-                      title: Text(task.title),
-                      trailing: IconButton(
-                        icon: const Icon(Icons.delete_outline),
-                        onPressed: () => ref
-                            .read(choreRepositoryProvider)
-                            .deleteTask(task.id),
+                  for (final (index, task) in entry.value.indexed)
+                    FadeSlideIn(
+                      delay: FadeSlideIn.staggerDelay(index),
+                      child: ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: Checkbox(
+                          value: false,
+                          onChanged: (_) => ref
+                              .read(choreRepositoryProvider)
+                              .markDone(task.id),
+                        ),
+                        title: Text(task.title),
+                        trailing: IconButton(
+                          icon: const Icon(Icons.delete_outline),
+                          onPressed: () => ref
+                              .read(choreRepositoryProvider)
+                              .deleteTask(task.id),
+                        ),
                       ),
                     ),
                   const SizedBox(height: 12),

@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../../../shared/widgets/account_avatar_button.dart';
+import '../../../shared/widgets/empty_state.dart';
+import '../../../shared/widgets/fade_slide_in.dart';
 import '../providers/vault_providers.dart';
 
 class VaultScreen extends ConsumerWidget {
@@ -21,12 +23,7 @@ class VaultScreen extends ConsumerWidget {
       body: notesAsync.when(
         data: (notes) {
           if (notes.isEmpty) {
-            return Center(
-              child: Text(
-                'No notes yet',
-                style: Theme.of(context).textTheme.bodyMedium,
-              ),
-            );
+            return const EmptyState(icon: Icons.lock_outline, message: 'No notes yet');
           }
           return ListView.separated(
             itemCount: notes.length,
@@ -34,16 +31,19 @@ class VaultScreen extends ConsumerWidget {
             itemBuilder: (context, index) {
               final note = notes[index];
               final snippet = note.body.split('\n').first;
-              return ListTile(
-                title: Text(note.title),
-                subtitle: Text(
-                  snippet.isEmpty
-                      ? DateFormat.yMMMd().format(note.updatedAt)
-                      : snippet,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+              return FadeSlideIn(
+                delay: FadeSlideIn.staggerDelay(index),
+                child: ListTile(
+                  title: Text(note.title),
+                  subtitle: Text(
+                    snippet.isEmpty
+                        ? DateFormat.yMMMd().format(note.updatedAt)
+                        : snippet,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  onTap: () => context.push('/vault/note/${note.id}'),
                 ),
-                onTap: () => context.push('/vault/note/${note.id}'),
               );
             },
           );

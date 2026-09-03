@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../../../shared/widgets/account_avatar_button.dart';
+import '../../../shared/widgets/empty_state.dart';
+import '../../../shared/widgets/fade_slide_in.dart';
 import '../../auth/providers/auth_providers.dart' show authStateProvider;
 import '../providers/grocery_providers.dart';
 
@@ -95,11 +97,9 @@ class GroceryScreen extends ConsumerWidget {
       body: itemsAsync.when(
         data: (items) {
           if (items.isEmpty) {
-            return Center(
-              child: Text(
-                'No groceries tracked yet',
-                style: Theme.of(context).textTheme.bodyMedium,
-              ),
+            return const EmptyState(
+              icon: Icons.kitchen_outlined,
+              message: 'No groceries tracked yet',
             );
           }
           return ListView.separated(
@@ -108,16 +108,19 @@ class GroceryScreen extends ConsumerWidget {
             itemBuilder: (context, index) {
               final item = items[index];
               final daysLeft = item.daysUntilExpiry();
-              return ListTile(
-                title: Text(item.name),
-                subtitle: Text(
-                  _expiryLabel(daysLeft),
-                  style: TextStyle(color: _expiryColor(context, daysLeft)),
-                ),
-                trailing: IconButton(
-                  icon: const Icon(Icons.delete_outline),
-                  onPressed: () =>
-                      ref.read(groceryRepositoryProvider).deleteItem(item.id),
+              return FadeSlideIn(
+                delay: FadeSlideIn.staggerDelay(index),
+                child: ListTile(
+                  title: Text(item.name),
+                  subtitle: Text(
+                    _expiryLabel(daysLeft),
+                    style: TextStyle(color: _expiryColor(context, daysLeft)),
+                  ),
+                  trailing: IconButton(
+                    icon: const Icon(Icons.delete_outline),
+                    onPressed: () =>
+                        ref.read(groceryRepositoryProvider).deleteItem(item.id),
+                  ),
                 ),
               );
             },
