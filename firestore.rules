@@ -64,6 +64,14 @@ service cloud.firestore {
       match /groceryItems/{itemId} {
         allow read, write: if isFamilyMember(familyId);
       }
+
+      match /choreTasks/{taskId} {
+        allow read, write: if isFamilyMember(familyId);
+      }
+
+      match /vaultNotes/{noteId} {
+        allow read, write: if isFamilyMember(familyId);
+      }
     }
   }
 }

@@ -4,10 +4,11 @@ import 'package:go_router/go_router.dart';
 import '../features/account/screens/account_screen.dart';
 import '../features/calendar/screens/day_detail_screen.dart';
 import '../features/calendar/screens/month_view_screen.dart';
-import '../features/chores/screens/placeholder_screen.dart' as chores;
+import '../features/chores/screens/chores_screen.dart';
 import '../features/grocery/screens/grocery_screen.dart';
 import '../features/more/screens/placeholder_screen.dart' as more;
-import '../features/vault/screens/placeholder_screen.dart' as vault;
+import '../features/vault/screens/note_edit_screen.dart';
+import '../features/vault/screens/vault_screen.dart';
 
 final GlobalKey<NavigatorState> _rootNavigatorKey = GlobalKey<NavigatorState>();
 
@@ -52,7 +53,7 @@ final GoRouter appRouter = GoRouter(
           routes: [
             GoRoute(
               path: '/chores',
-              builder: (context, state) => const chores.PlaceholderScreen(),
+              builder: (context, state) => const ChoresScreen(),
             ),
           ],
         ),
@@ -60,7 +61,19 @@ final GoRouter appRouter = GoRouter(
           routes: [
             GoRoute(
               path: '/vault',
-              builder: (context, state) => const vault.PlaceholderScreen(),
+              builder: (context, state) => const VaultScreen(),
+              routes: [
+                GoRoute(
+                  path: 'new',
+                  builder: (context, state) => const NoteEditScreen(),
+                ),
+                GoRoute(
+                  path: 'note/:id',
+                  builder: (context, state) => NoteEditScreen(
+                    noteId: state.pathParameters['id'],
+                  ),
+                ),
+              ],
             ),
           ],
         ),
