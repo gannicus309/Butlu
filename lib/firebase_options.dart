@@ -69,6 +69,7 @@ class DefaultFirebaseOptions {
     messagingSenderId: '552503667814',
     projectId: 'butlu-cb898',
     storageBucket: 'butlu-cb898.firebasestorage.app',
+    iosClientId: '552503667814-tiqg262mel8vcqdl59lgsn9lhthphhoq.apps.googleusercontent.com',
     iosBundleId: 'com.butlu.butlu',
   );
 }
