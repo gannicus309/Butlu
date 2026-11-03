@@ -8,7 +8,6 @@ import 'package:table_calendar/table_calendar.dart';
 import '../../../shared/widgets/account_avatar_button.dart';
 import '../../../shared/widgets/fade_slide_in.dart';
 import '../providers/calendar_providers.dart';
-import '../providers/calendar_selection_provider.dart';
 import '../widgets/event_dot_marker.dart';
 import '../widgets/event_list_tile.dart';
 
@@ -67,9 +66,24 @@ class _MonthViewScreenState extends ConsumerState<MonthViewScreen>
     try {
       do {
         _syncAgain = false;
-        await ref.read(calendarSyncServiceProvider).runFullSync();
+        final perCalendar = await ref
+            .read(calendarSyncServiceProvider)
+            .runFullSync();
+        ref.read(lastCalendarSyncProvider.notifier).state = CalendarSyncReport(
+          at: DateTime.now(),
+          eventsPerCalendar: perCalendar,
+        );
       } while (_syncAgain && mounted);
-    } catch (e) {
+    } catch (e, st) {
+      debugPrint('Calendar sync failed: $e\n$st');
+      // Kept for the picker too: release builds log nowhere the user (or a
+      // developer without a debugger) can see.
+      if (mounted) {
+        ref.read(lastCalendarSyncProvider.notifier).state = CalendarSyncReport(
+          at: DateTime.now(),
+          error: '$e',
+        );
+      }
       if (mounted && !quiet) {
         ScaffoldMessenger.of(context)
             .showSnackBar(SnackBar(content: Text('Sync failed: $e')));
@@ -83,13 +97,19 @@ class _MonthViewScreenState extends ConsumerState<MonthViewScreen>
 
   @override
   Widget build(BuildContext context) {
-    // Re-sync straight away when calendars are switched on/off in the picker.
-    ref.listen(calendarSelectionProvider, (previous, next) => _syncNow());
+    // Re-sync straight away when calendars are switched on/off or given a
+    // different colour role in the picker. Listening to the sync service
+    // itself, not the picker's providers: it's rebuilt from those choices,
+    // so by the time this fires the new service already uses them. (A
+    // listener on the choices fired before that rebuild and synced with the
+    // old ones.)
+    ref.listen(calendarSyncServiceProvider, (previous, next) => _syncNow());
 
     final scheme = Theme.of(context).colorScheme;
     final focusedMonth = ref.watch(focusedMonthProvider);
     final selectedDay = ref.watch(selectedDayProvider) ?? DateTime.now();
     final eventsByDay = ref.watch(eventsByDayProvider);
+    final eventsError = ref.watch(eventsProvider).error;
     final dayEvents =
         eventsByDay[DateTime(
           selectedDay.year,
@@ -175,6 +195,20 @@ class _MonthViewScreenState extends ConsumerState<MonthViewScreen>
               ),
             ),
           ),
+          // A broken stored event fails the whole live stream, which would
+          // otherwise just look like an empty calendar.
+          if (eventsError != null)
+            Card(
+              margin: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+              color: scheme.errorContainer,
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: SelectableText(
+                  "Couldn't load events: $eventsError",
+                  style: TextStyle(color: scheme.onErrorContainer),
+                ),
+              ),
+            ),
           const SizedBox(height: 4),
           _DayHeader(
             day: selectedDay,

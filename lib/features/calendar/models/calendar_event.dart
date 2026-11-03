@@ -1,3 +1,4 @@
+import 'calendar_category.dart';
 import 'event_source.dart';
 
 /// Reference to the same event in an external calendar system (EventKit or
@@ -47,6 +48,10 @@ class CalendarEvent {
   /// it is. Null for Butlu-native and Outlook events.
   final String? calendarName;
   final String? colorHex;
+
+  /// Set on iOS imports from the picker's role for their calendar; use
+  /// [effectiveCategory] to read it, which also covers the other sources.
+  final CalendarCategory? category;
   final DateTime lastModifiedAt;
   final EventSource lastModifiedBy;
   final bool deleted;
@@ -66,10 +71,26 @@ class CalendarEvent {
     this.outlookRef,
     this.calendarName,
     this.colorHex,
+    this.category,
     required this.lastModifiedAt,
     required this.lastModifiedBy,
     this.deleted = false,
   });
+
+  /// Decides the event's colour: the picker role for iOS imports (Family
+  /// until one is set), green for Butlu-native events, blue for Outlook.
+  CalendarCategory get effectiveCategory {
+    final explicit = category;
+    if (explicit != null) return explicit;
+    switch (source) {
+      case EventSource.butlu:
+        return CalendarCategory.butlu;
+      case EventSource.outlook:
+        return CalendarCategory.myOffice;
+      case EventSource.ios:
+        return CalendarCategory.family;
+    }
+  }
 
   ExternalRef? refFor(EventSource externalSource) {
     switch (externalSource) {
@@ -94,6 +115,7 @@ class CalendarEvent {
     ExternalRef? outlookRef,
     String? calendarName,
     String? colorHex,
+    CalendarCategory? category,
     DateTime? lastModifiedAt,
     EventSource? lastModifiedBy,
     bool? deleted,
@@ -113,6 +135,7 @@ class CalendarEvent {
       outlookRef: outlookRef ?? this.outlookRef,
       calendarName: calendarName ?? this.calendarName,
       colorHex: colorHex ?? this.colorHex,
+      category: category ?? this.category,
       lastModifiedAt: lastModifiedAt ?? this.lastModifiedAt,
       lastModifiedBy: lastModifiedBy ?? this.lastModifiedBy,
       deleted: deleted ?? this.deleted,

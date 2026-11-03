@@ -9,8 +9,6 @@ abstract class FirestoreEventRepository {
 
   Future<List<CalendarEvent>> fetchAll();
 
-  Future<CalendarEvent?> findById(String id);
-
   Future<CalendarEvent?> findByExternalId({
     required EventSource source,
     required String externalId,
@@ -20,4 +18,11 @@ abstract class FirestoreEventRepository {
   Future<void> upsert(CalendarEvent event);
 
   Future<void> softDelete(String eventId);
+
+  /// Bulk versions for the sync engine. Written as batches, so a sync of
+  /// hundreds of events reaches [watchEvents] listeners as a handful of
+  /// updates rather than one per event.
+  Future<void> upsertAll(List<CalendarEvent> events);
+
+  Future<void> softDeleteAll(List<String> eventIds);
 }

@@ -2,6 +2,7 @@ import 'package:device_calendar_plus/device_calendar_plus.dart' as dcp;
 import 'package:flutter/foundation.dart'
     show TargetPlatform, defaultTargetPlatform, kIsWeb;
 
+import '../models/calendar_category.dart';
 import '../models/calendar_event.dart';
 import '../models/device_calendar_info.dart';
 import '../models/event_source.dart';
@@ -26,6 +27,7 @@ class IosCalendarRepositoryImpl extends IosCalendarRepository {
   IosCalendarRepositoryImpl({
     required this._currentUid,
     this.excludedCalendarIds,
+    this.calendarRoles = const {},
     dcp.DeviceCalendar? plugin,
   }) : _plugin = plugin ?? dcp.DeviceCalendar.instance;
 
@@ -36,6 +38,10 @@ class IosCalendarRepositoryImpl extends IosCalendarRepository {
   /// touched it, in which case [DeviceCalendarInfo.isExcludedByDefault]
   /// decides instead.
   final Set<String>? excludedCalendarIds;
+
+  /// Colour role per calendar id, from the picker. Unassigned calendars
+  /// count as [CalendarCategory.family].
+  final Map<String, CalendarCategory> calendarRoles;
 
   @override
   String get ownerUid => _currentUid;
@@ -154,9 +160,21 @@ class IosCalendarRepositoryImpl extends IosCalendarRepository {
   /// Occurrences are told apart by start time instead (the plugin's own
   /// `instanceId` is documented as unstable). One-off events keep the bare
   /// `eventId`, matching documents synced before this distinction existed.
-  static String firestoreIdFor(dcp.Event event) => event.isRecurring
-      ? '${event.eventId}@${event.startDate.toUtc().millisecondsSinceEpoch}'
-      : event.eventId;
+  static String firestoreIdFor(dcp.Event event) => safeDocumentId(
+    event.isRecurring
+        ? '${event.eventId}@${event.startDate.toUtc().millisecondsSinceEpoch}'
+        : event.eventId,
+  );
+
+  /// EventKit ids are used as Firestore document ids, and Firestore treats
+  /// `/` as a path separator: events from subscribed calendars (e.g. a
+  /// published Outlook calendar) have `/` in their ids, and the native SDK
+  /// aborts the whole app on such a path rather than throwing anything Dart
+  /// can catch. So `/` is escaped -- along with `%`, so two different ids can
+  /// never map to the same document. Ids without either are left unchanged,
+  /// so documents synced before this keep matching.
+  static String safeDocumentId(String raw) =>
+      raw.replaceAll('%', '%25').replaceAll('/', '%2F');
 
   CalendarEvent _toCalendarEvent(
     dcp.Event event, {
@@ -179,6 +197,7 @@ class IosCalendarRepositoryImpl extends IosCalendarRepository {
       ),
       calendarName: calendar?.name,
       colorHex: event.colorHex ?? calendar?.colorHex,
+      category: calendarRoles[event.calendarId] ?? CalendarCategory.family,
       lastModifiedAt: syncedAt,
       lastModifiedBy: EventSource.ios,
     );

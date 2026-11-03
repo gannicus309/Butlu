@@ -23,7 +23,9 @@ class DeviceCalendarInfo {
   final bool readOnly;
 
   static final _offByDefault = RegExp(
-    r'holiday|birthday|siri suggestion|found in',
+    // English and German names, as iOS shows them on a German phone
+    // (Deutsche Feiertage, Geburtstage, Siri-Vorschläge).
+    r'holiday|birthday|siri suggestion|found in|feiertag|geburtstag|siri-vorschl',
     caseSensitive: false,
   );
 

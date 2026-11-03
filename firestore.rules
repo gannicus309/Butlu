@@ -32,9 +32,16 @@ service cloud.firestore {
         (request.auth.uid in resource.data.memberUids ||
          request.auth.token.email in resource.data.invitedEmails);
 
+      // Anonymous accounts (the app's dev-mode sign-in, kDevSignIn) have no
+      // email, so they may create a family of one with no invites -- which
+      // nobody else can ever join, since joining needs a verified email.
       allow create: if request.auth != null &&
         request.resource.data.memberUids == [request.auth.uid] &&
-        request.auth.token.email in request.resource.data.invitedEmails;
+        (
+          (request.auth.token.firebase.sign_in_provider == 'anonymous' &&
+           request.resource.data.invitedEmails.size() == 0) ||
+          request.auth.token.email in request.resource.data.invitedEmails
+        );
 
       // Existing members can update anything. A non-member may only append
       // their own uid to memberUids (accepting an invite) -- nothing else

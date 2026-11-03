@@ -3,12 +3,14 @@ import 'package:butlu/features/calendar/data/firestore_event_repository.dart';
 import 'package:butlu/features/calendar/data/ios_calendar_repository.dart';
 import 'package:butlu/features/calendar/models/calendar_event.dart';
 import 'package:butlu/features/calendar/models/device_calendar_info.dart';
+import 'package:butlu/features/calendar/providers/calendar_selection_provider.dart';
 import 'package:butlu/features/calendar/models/event_source.dart';
 import 'package:butlu/features/calendar/providers/calendar_providers.dart';
 import 'package:butlu/main.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 /// Fixed-content fake so the widget tests don't need a live Firebase
 /// project -- ButluApp itself has no knowledge this isn't the real
@@ -24,9 +26,6 @@ class _FakeFirestoreEventRepository implements FirestoreEventRepository {
   Future<List<CalendarEvent>> fetchAll() async => events;
 
   @override
-  Future<CalendarEvent?> findById(String id) async => null;
-
-  @override
   Future<CalendarEvent?> findByExternalId({
     required EventSource source,
     required String externalId,
@@ -37,6 +36,12 @@ class _FakeFirestoreEventRepository implements FirestoreEventRepository {
 
   @override
   Future<void> softDelete(String eventId) async {}
+
+  @override
+  Future<void> upsertAll(List<CalendarEvent> events) async {}
+
+  @override
+  Future<void> softDeleteAll(List<String> eventIds) async {}
 }
 
 List<CalendarEvent> _sampleEvents() {
@@ -86,9 +91,17 @@ class _NoCalendarAccess extends IosCalendarRepository {
 }
 
 void main() {
+  late SharedPreferences prefs;
+
+  setUp(() async {
+    SharedPreferences.setMockInitialValues({});
+    prefs = await SharedPreferences.getInstance();
+  });
+
   Widget appWithFakeData() {
     return ProviderScope(
       overrides: [
+        sharedPreferencesProvider.overrideWithValue(prefs),
         firestoreEventRepositoryProvider.overrideWithValue(
           _FakeFirestoreEventRepository(_sampleEvents()),
         ),

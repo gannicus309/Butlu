@@ -7,6 +7,7 @@ import '../data/firestore_event_repository_impl.dart';
 import '../data/ios_calendar_repository.dart';
 import '../data/ios_calendar_repository_impl.dart';
 import '../models/calendar_event.dart';
+import '../models/event_dedupe.dart';
 import '../sync/calendar_sync_service.dart';
 import 'calendar_selection_provider.dart';
 
@@ -41,8 +42,10 @@ final selectedDayProvider = StateProvider<DateTime?>((ref) => null);
 final eventsByDayProvider = Provider<Map<DateTime, List<CalendarEvent>>>((ref) {
   final events = ref.watch(eventsProvider).value ?? const [];
   final map = <DateTime, List<CalendarEvent>>{};
-  for (final event in events) {
-    if (event.deleted) continue;
+  for (final event in mergeDuplicates([
+    for (final e in events)
+      if (!e.deleted) e,
+  ])) {
     final key = _dateOnly(event.startAt.toLocal());
     map.putIfAbsent(key, () => []).add(event);
   }
@@ -62,6 +65,7 @@ final iosCalendarRepositoryProvider = Provider<IosCalendarRepository>((ref) {
   return IosCalendarRepositoryImpl(
     currentUid: uid,
     excludedCalendarIds: ref.watch(calendarSelectionProvider),
+    calendarRoles: ref.watch(calendarRolesProvider),
   );
 });
 
@@ -71,8 +75,32 @@ final iosCalendarRepositoryProvider = Provider<IosCalendarRepository>((ref) {
 /// from its sync button.
 /// The phone's calendars, for the picker. Re-fetched each time the picker
 /// opens (autoDispose), so a newly accepted shared calendar shows up.
+///
+/// Its own repository instance rather than [iosCalendarRepositoryProvider]:
+/// that one is rebuilt whenever a calendar is switched on/off or recoloured,
+/// which would reload this list on every toggle and jump the picker back to
+/// the top mid-scroll.
 final deviceCalendarsProvider = FutureProvider.autoDispose(
-  (ref) => ref.watch(iosCalendarRepositoryProvider).listCalendars(),
+  (ref) => IosCalendarRepositoryImpl(currentUid: '').listCalendars(),
+);
+
+/// Outcome of the Calendar tab's most recent sync, shown in the picker.
+class CalendarSyncReport {
+  const CalendarSyncReport({
+    required this.at,
+    this.eventsPerCalendar = const {},
+    this.error,
+  });
+
+  final DateTime at;
+  final Map<String, int> eventsPerCalendar;
+
+  /// Set when the sync failed; [eventsPerCalendar] is then empty.
+  final String? error;
+}
+
+final lastCalendarSyncProvider = StateProvider<CalendarSyncReport?>(
+  (ref) => null,
 );
 
 final calendarSyncServiceProvider = Provider<CalendarSyncService>(

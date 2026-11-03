@@ -1,12 +1,18 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../app/dev_mode.dart';
 import '../../../services/auth_service.dart';
 import '../../../services/family_service.dart';
 
 final authServiceProvider = Provider<AuthService>((ref) => AuthService());
 
 final familyServiceProvider = Provider<FamilyService>((ref) => FamilyService());
+
+/// Signs in anonymously when `kDevSignIn` is on and nobody is signed in.
+final devSignInProvider = FutureProvider<void>(
+  (ref) => ref.read(authServiceProvider).signInForDevelopment(),
+);
 
 final authStateProvider = StreamProvider<User?>((ref) {
   return ref.watch(authServiceProvider).authStateChanges;
@@ -41,6 +47,10 @@ final familyStatusProvider = FutureProvider<FamilyStatus>((ref) async {
   final familyService = ref.watch(familyServiceProvider);
   final existingId = await familyService.findFamilyIdForMember(user.uid);
   if (existingId != null) return FamilyStatusMember(existingId);
+
+  if (kDevSignIn && user.isAnonymous) {
+    return FamilyStatusMember(await familyService.createDevFamily(user.uid));
+  }
 
   final email = user.email;
   if (email != null) {

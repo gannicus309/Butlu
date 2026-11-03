@@ -1,3 +1,4 @@
 {
-  "GEMINI_API_KEY": "your-key-from-aistudio.google.com/apikey"
+  "GEMINI_API_KEY": "your-key-from-aistudio.google.com/apikey",
+  "BUTLU_DEV_SIGN_IN": false
 }

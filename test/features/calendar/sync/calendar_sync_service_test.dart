@@ -2,6 +2,7 @@ import 'package:butlu/features/calendar/data/external_calendar_repository.dart';
 import 'package:butlu/features/calendar/data/firestore_event_repository.dart';
 import 'package:butlu/features/calendar/data/ios_calendar_repository.dart';
 import 'package:butlu/features/calendar/data/outlook_calendar_repository.dart';
+import 'package:butlu/features/calendar/models/calendar_category.dart';
 import 'package:butlu/features/calendar/models/calendar_event.dart';
 import 'package:butlu/features/calendar/models/device_calendar_info.dart';
 import 'package:butlu/features/calendar/models/event_source.dart';
@@ -17,9 +18,6 @@ class FakeFirestoreEventRepository implements FirestoreEventRepository {
 
   @override
   Future<List<CalendarEvent>> fetchAll() async => store.values.toList();
-
-  @override
-  Future<CalendarEvent?> findById(String id) async => store[id];
 
   @override
   Future<CalendarEvent?> findByExternalId({
@@ -43,6 +41,20 @@ class FakeFirestoreEventRepository implements FirestoreEventRepository {
     final existing = store[eventId];
     if (existing != null) {
       store[eventId] = existing.copyWith(deleted: true);
+    }
+  }
+
+  @override
+  Future<void> upsertAll(List<CalendarEvent> events) async {
+    for (final event in events) {
+      store[event.id] = event;
+    }
+  }
+
+  @override
+  Future<void> softDeleteAll(List<String> eventIds) async {
+    for (final id in eventIds) {
+      await softDelete(id);
     }
   }
 }
@@ -429,4 +441,60 @@ void main() {
       expect(firestore.store['doc-1']!.lastModifiedBy, EventSource.butlu);
     },
   );
+
+  test(
+    'changing a calendar\'s colour role recolours its imported events',
+    () async {
+      firestore.store['doc-1'] = iosImport(
+        'doc-1',
+        'ios-1',
+      ).copyWith(category: CalendarCategory.family);
+      ios.windowResult = [
+        iosImport('doc-1', 'ios-1').copyWith(
+          category: CalendarCategory.partnerOffice,
+          // A real iOS fetch is always stamped with the current sync time.
+          lastModifiedAt: DateTime.utc(2026, 9, 2),
+        ),
+      ];
+
+      await sync.runFullSync();
+
+      expect(
+        firestore.store['doc-1']!.effectiveCategory,
+        CalendarCategory.partnerOffice,
+      );
+    },
+  );
+
+  test('events created in Butlu are green, imports default to Family', () {
+    final butlu = _event(
+      id: 'b',
+      source: EventSource.butlu,
+      lastModifiedBy: EventSource.butlu,
+      lastModifiedAt: DateTime.utc(2026, 9, 1),
+    );
+    expect(butlu.effectiveCategory, CalendarCategory.butlu);
+    expect(iosImport('i', 'ios-i').effectiveCategory, CalendarCategory.family);
+  });
+
+  test('an unchanged event read back in local time is not rewritten', () async {
+    // Firestore returns dates in local time, EventKit in UTC: the same
+    // instant, but unequal under DateTime ==.
+    final local = iosImport('doc-1', 'ios-1');
+    firestore.store['doc-1'] = local.copyWith(
+      startAt: local.startAt.toLocal(),
+      endAt: local.endAt.toLocal(),
+      lastModifiedBy: EventSource.butlu,
+    );
+    ios.windowResult = [
+      iosImport(
+        'doc-1',
+        'ios-1',
+      ).copyWith(lastModifiedAt: DateTime.utc(2026, 9, 2)),
+    ];
+
+    await sync.runFullSync();
+
+    expect(firestore.store['doc-1']!.lastModifiedBy, EventSource.butlu);
+  });
 }

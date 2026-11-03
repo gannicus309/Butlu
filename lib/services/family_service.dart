@@ -55,6 +55,25 @@ class FamilyService {
     return doc.id;
   }
 
+  /// A family of one for an anonymous development account (`kDevSignIn`).
+  /// There's no email to invite with, so `invitedEmails` is empty; the
+  /// matching firestore.rules case only allows this for anonymous accounts.
+  Future<String> createDevFamily(String uid) async {
+    final doc = _families.doc();
+    await doc.set({
+      'name': 'Dev family',
+      'memberUids': [uid],
+      'invitedEmails': <String>[],
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+    await doc.collection('members').doc(uid).set({
+      'displayName': 'Developer',
+      'email': null,
+      'outlookAccountConnected': false,
+    });
+    return doc.id;
+  }
+
   Future<void> joinFamily({
     required String familyId,
     required String uid,

@@ -1,19 +1,28 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
+import 'app/dev_mode.dart';
 import 'app/router.dart';
 import 'app/theme.dart';
 import 'features/auth/providers/auth_providers.dart';
 import 'features/auth/screens/family_setup_screen.dart';
 import 'features/auth/screens/sign_in_screen.dart';
+import 'features/calendar/providers/calendar_selection_provider.dart';
 import 'firebase_options.dart';
 import 'shared/widgets/butlu_logo.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-  runApp(const ProviderScope(child: ButluRoot()));
+  final prefs = await SharedPreferences.getInstance();
+  runApp(
+    ProviderScope(
+      overrides: [sharedPreferencesProvider.overrideWithValue(prefs)],
+      child: const ButluRoot(),
+    ),
+  );
 }
 
 Widget _wrapPlain(Widget home) =>
@@ -30,8 +39,20 @@ class ButluRoot extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final authState = ref.watch(authStateProvider);
     return authState.when(
-      data: (user) =>
-          user == null ? _wrapPlain(const SignInScreen()) : const _FamilyGate(),
+      data: (user) {
+        if (user != null) return const _FamilyGate();
+        if (!kDevSignIn) return _wrapPlain(const SignInScreen());
+        // Dev builds skip Google: sign in anonymously, and authStateProvider
+        // moves on to _FamilyGate once that lands.
+        return ref
+            .watch(devSignInProvider)
+            .when(
+              data: (_) => _wrapPlain(const _LoadingScreen()),
+              loading: () => _wrapPlain(const _LoadingScreen()),
+              error: (error, stackTrace) =>
+                  _wrapPlain(_ErrorScreen(error: error)),
+            );
+      },
       loading: () => _wrapPlain(const _LoadingScreen()),
       error: (error, stackTrace) => _wrapPlain(_ErrorScreen(error: error)),
     );

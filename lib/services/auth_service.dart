@@ -72,6 +72,11 @@ class AuthService {
     // it once that finishes.
   }
 
+  /// Anonymous Firebase sign-in for development builds -- see `kDevSignIn`.
+  Future<void> signInForDevelopment() async {
+    await _firebaseAuth.signInAnonymously();
+  }
+
   Future<void> signOut() async {
     await _firebaseAuth.signOut();
     await _googleSignIn.signOut();
