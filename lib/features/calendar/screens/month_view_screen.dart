@@ -6,10 +6,8 @@ import 'package:intl/intl.dart';
 import 'package:table_calendar/table_calendar.dart';
 
 import '../../../shared/widgets/account_avatar_button.dart';
-import '../../../shared/widgets/fade_slide_in.dart';
 import '../providers/calendar_providers.dart';
 import '../widgets/event_dot_marker.dart';
-import '../widgets/event_list_tile.dart';
 
 class MonthViewScreen extends ConsumerStatefulWidget {
   const MonthViewScreen({super.key});
@@ -110,13 +108,6 @@ class _MonthViewScreenState extends ConsumerState<MonthViewScreen>
     final selectedDay = ref.watch(selectedDayProvider) ?? DateTime.now();
     final eventsByDay = ref.watch(eventsByDayProvider);
     final eventsError = ref.watch(eventsProvider).error;
-    final dayEvents =
-        eventsByDay[DateTime(
-          selectedDay.year,
-          selectedDay.month,
-          selectedDay.day,
-        )] ??
-        const [];
 
     return Scaffold(
       appBar: AppBar(
@@ -140,58 +131,65 @@ class _MonthViewScreenState extends ConsumerState<MonthViewScreen>
       ),
       body: Column(
         children: [
-          TableCalendar(
-            firstDay: DateTime.utc(2020, 1, 1),
-            lastDay: DateTime.utc(2035, 12, 31),
-            focusedDay: focusedMonth,
-            selectedDayPredicate: (day) => _isSameDay(day, selectedDay),
-            eventLoader: (day) =>
-                eventsByDay[DateTime(day.year, day.month, day.day)] ?? const [],
-            onPageChanged: (focused) =>
-                ref.read(focusedMonthProvider.notifier).state = focused,
-            onDaySelected: (selected, focused) {
-              if (_isSameDay(selected, selectedDay)) {
+          Expanded(
+            child: TableCalendar(
+              // Fills the screen now the day list below it is gone; a day's
+              // detail is its hour-by-hour timeline, one tap away.
+              shouldFillViewport: true,
+              firstDay: DateTime.utc(2020, 1, 1),
+              lastDay: DateTime.utc(2035, 12, 31),
+              focusedDay: focusedMonth,
+              selectedDayPredicate: (day) => _isSameDay(day, selectedDay),
+              eventLoader: (day) =>
+                  eventsByDay[DateTime(day.year, day.month, day.day)] ??
+                  const [],
+              onPageChanged: (focused) =>
+                  ref.read(focusedMonthProvider.notifier).state = focused,
+              onDaySelected: (selected, focused) {
+                HapticFeedback.selectionClick();
+                ref.read(selectedDayProvider.notifier).state = selected;
+                ref.read(focusedMonthProvider.notifier).state = focused;
                 _openDay(selected);
-                return;
-              }
-              HapticFeedback.selectionClick();
-              ref.read(selectedDayProvider.notifier).state = selected;
-              ref.read(focusedMonthProvider.notifier).state = focused;
-            },
-            calendarFormat: CalendarFormat.month,
-            availableCalendarFormats: const {CalendarFormat.month: 'Month'},
-            startingDayOfWeek: StartingDayOfWeek.monday,
-            rowHeight: 48,
-            headerStyle: HeaderStyle(
-              formatButtonVisible: false,
-              titleCentered: true,
-              titleTextStyle: Theme.of(context).textTheme.titleMedium!,
-            ),
-            calendarStyle: CalendarStyle(
-              todayDecoration: BoxDecoration(
-                color: scheme.primary.withValues(alpha: 0.25),
-                shape: BoxShape.circle,
+              },
+              calendarFormat: CalendarFormat.month,
+              availableCalendarFormats: const {CalendarFormat.month: 'Month'},
+              startingDayOfWeek: StartingDayOfWeek.monday,
+              headerStyle: HeaderStyle(
+                formatButtonVisible: false,
+                titleCentered: true,
+                titleTextStyle: Theme.of(context).textTheme.titleMedium!,
               ),
-              todayTextStyle: TextStyle(
-                color: scheme.primary,
-                fontWeight: FontWeight.w700,
+              calendarStyle: CalendarStyle(
+                todayDecoration: BoxDecoration(
+                  color: scheme.primary.withValues(alpha: 0.25),
+                  shape: BoxShape.circle,
+                ),
+                todayTextStyle: TextStyle(
+                  color: scheme.primary,
+                  fontWeight: FontWeight.w700,
+                ),
+                selectedDecoration: BoxDecoration(
+                  color: scheme.primary,
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: scheme.primary.withValues(alpha: 0.45),
+                      blurRadius: 10,
+                    ),
+                  ],
+                ),
+                outsideDaysVisible: false,
               ),
-              selectedDecoration: BoxDecoration(
-                color: scheme.primary,
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: scheme.primary.withValues(alpha: 0.45),
-                    blurRadius: 10,
+              calendarBuilders: CalendarBuilders(
+                // Just under the day number: the cells are tall now the grid
+                // fills the screen, and dots at the cell bottom looked
+                // detached from their day.
+                markerBuilder: (context, day, events) => Positioned.fill(
+                  child: Align(
+                    alignment: const Alignment(0, 0.55),
+                    child: EventDotMarkers(events: events.cast()),
                   ),
-                ],
-              ),
-              outsideDaysVisible: false,
-            ),
-            calendarBuilders: CalendarBuilders(
-              markerBuilder: (context, day, events) => Positioned(
-                bottom: 4,
-                child: EventDotMarkers(events: events.cast()),
+                ),
               ),
             ),
           ),
@@ -209,43 +207,6 @@ class _MonthViewScreenState extends ConsumerState<MonthViewScreen>
                 ),
               ),
             ),
-          const SizedBox(height: 4),
-          _DayHeader(
-            day: selectedDay,
-            count: dayEvents.length,
-            onOpen: () => _openDay(selectedDay),
-          ),
-          Expanded(
-            child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 280),
-              switchInCurve: Curves.easeOutCubic,
-              switchOutCurve: Curves.easeInCubic,
-              transitionBuilder: (child, animation) => FadeTransition(
-                opacity: animation,
-                child: SlideTransition(
-                  position: Tween(
-                    begin: const Offset(0, 0.04),
-                    end: Offset.zero,
-                  ).animate(animation),
-                  child: child,
-                ),
-              ),
-              child: dayEvents.isEmpty
-                  ? _NothingPlanned(
-                      key: ValueKey('empty-$selectedDay'),
-                      onAdd: () => _openDay(selectedDay),
-                    )
-                  : ListView.builder(
-                      key: ValueKey('list-$selectedDay'),
-                      padding: const EdgeInsets.only(bottom: 24),
-                      itemCount: dayEvents.length,
-                      itemBuilder: (context, index) => FadeSlideIn(
-                        delay: FadeSlideIn.staggerDelay(index),
-                        child: EventListTile(event: dayEvents[index]),
-                      ),
-                    ),
-            ),
-          ),
         ],
       ),
     );
@@ -253,79 +214,4 @@ class _MonthViewScreenState extends ConsumerState<MonthViewScreen>
 
   void _openDay(DateTime day) =>
       context.go('/calendar/day/${DateFormat('yyyy-MM-dd').format(day)}');
-}
-
-class _DayHeader extends StatelessWidget {
-  const _DayHeader({
-    required this.day,
-    required this.count,
-    required this.onOpen,
-  });
-
-  final DateTime day;
-  final int count;
-  final VoidCallback onOpen;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return InkWell(
-      onTap: onOpen,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 10, 12, 6),
-        child: Row(
-          children: [
-            Expanded(
-              child: AnimatedSwitcher(
-                duration: const Duration(milliseconds: 200),
-                child: Text(
-                  DateFormat.MMMMEEEEd().format(day),
-                  key: ValueKey(day),
-                  style: theme.textTheme.titleMedium,
-                ),
-              ),
-            ),
-            Text(
-              count == 0 ? '' : '$count event${count == 1 ? '' : 's'}',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.outline,
-              ),
-            ),
-            Icon(Icons.chevron_right, color: theme.colorScheme.outline),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _NothingPlanned extends StatelessWidget {
-  const _NothingPlanned({super.key, required this.onAdd});
-
-  final VoidCallback onAdd;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    // Scrollable so it never overflows the little space left under the month
-    // grid on a short screen.
-    return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(vertical: 24),
-      child: Column(
-        children: [
-          Icon(Icons.wb_sunny_outlined, size: 40, color: scheme.outline),
-          const SizedBox(height: 8),
-          Text(
-            'Nothing planned',
-            style: Theme.of(context).textTheme.bodyMedium,
-          ),
-          TextButton.icon(
-            onPressed: onAdd,
-            icon: const Icon(Icons.add),
-            label: const Text('Add event'),
-          ),
-        ],
-      ),
-    );
-  }
 }

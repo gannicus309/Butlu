@@ -46,8 +46,23 @@ final eventsByDayProvider = Provider<Map<DateTime, List<CalendarEvent>>>((ref) {
     for (final e in events)
       if (!e.deleted) e,
   ])) {
-    final key = _dateOnly(event.startAt.toLocal());
-    map.putIfAbsent(key, () => []).add(event);
+    // Filed under every day it covers, so an event running past midnight or
+    // a multi-day all-day event shows on each of its days. The end is
+    // exclusive: an all-day event ends at the next midnight.
+    final first = _dateOnly(event.startAt.toLocal());
+    final lastMoment = event.endAt.toLocal().subtract(
+      const Duration(microseconds: 1),
+    );
+    final last = lastMoment.isBefore(event.startAt.toLocal())
+        ? first
+        : _dateOnly(lastMoment);
+    for (
+      var day = first, n = 0;
+      !day.isAfter(last) && n < 62;
+      day = DateTime(day.year, day.month, day.day + 1), n++
+    ) {
+      map.putIfAbsent(day, () => []).add(event);
+    }
   }
   for (final list in map.values) {
     list.sort((a, b) => a.startAt.compareTo(b.startAt));
