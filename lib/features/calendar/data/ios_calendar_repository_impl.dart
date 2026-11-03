@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart'
     show TargetPlatform, defaultTargetPlatform, kIsWeb;
 
 import '../models/calendar_event.dart';
+import '../models/device_calendar_info.dart';
 import '../models/event_source.dart';
 import 'ios_calendar_repository.dart';
 
@@ -24,11 +25,20 @@ import 'ios_calendar_repository.dart';
 class IosCalendarRepositoryImpl extends IosCalendarRepository {
   IosCalendarRepositoryImpl({
     required this._currentUid,
+    this.excludedCalendarIds,
     dcp.DeviceCalendar? plugin,
   }) : _plugin = plugin ?? dcp.DeviceCalendar.instance;
 
   final String _currentUid;
   final dcp.DeviceCalendar _plugin;
+
+  /// Calendars the user switched off in the picker. Null until they've
+  /// touched it, in which case [DeviceCalendarInfo.isExcludedByDefault]
+  /// decides instead.
+  final Set<String>? excludedCalendarIds;
+
+  @override
+  String get ownerUid => _currentUid;
 
   static bool get _isSupportedPlatform =>
       !kIsWeb &&
@@ -52,11 +62,50 @@ class IosCalendarRepositoryImpl extends IosCalendarRepository {
   }
 
   @override
+  Future<List<DeviceCalendarInfo>> listCalendars() async {
+    if (!await hasPermission()) return const [];
+    final calendars = await _plugin.listCalendars();
+    return [
+      for (final c in calendars)
+        DeviceCalendarInfo(
+          id: c.id,
+          name: c.name,
+          colorHex: c.colorHex,
+          accountName: c.accountName,
+          readOnly: c.readOnly,
+        ),
+    ];
+  }
+
+  @override
   Future<List<CalendarEvent>> fetchWindow(DateTime start, DateTime end) async {
     if (!await hasPermission()) return const [];
-    final events = await _plugin.listEvents(start, end);
+    final excluded = excludedCalendarIds;
+    final included = {
+      for (final c in await listCalendars())
+        if (excluded == null
+            ? !c.isExcludedByDefault
+            : !excluded.contains(c.id))
+          c.id: c,
+    };
+    // An empty `calendarIds` list would mean "all calendars" to the plugin,
+    // the opposite of what everything-switched-off should do.
+    if (included.isEmpty) return const [];
+    final events = await _plugin.listEvents(
+      start,
+      end,
+      calendarIds: included.keys.toList(),
+    );
     final syncedAt = DateTime.now().toUtc();
-    return events.map((e) => _toCalendarEvent(e, syncedAt: syncedAt)).toList();
+    return events
+        .map(
+          (e) => _toCalendarEvent(
+            e,
+            calendar: included[e.calendarId],
+            syncedAt: syncedAt,
+          ),
+        )
+        .toList();
   }
 
   @override
@@ -100,9 +149,22 @@ class IosCalendarRepositoryImpl extends IosCalendarRepository {
     }
   }
 
-  CalendarEvent _toCalendarEvent(dcp.Event event, {required DateTime syncedAt}) {
+  /// Every occurrence of a repeating event shares one EventKit `eventId`, so
+  /// keying on that alone collapsed a weekly event into a single entry.
+  /// Occurrences are told apart by start time instead (the plugin's own
+  /// `instanceId` is documented as unstable). One-off events keep the bare
+  /// `eventId`, matching documents synced before this distinction existed.
+  static String firestoreIdFor(dcp.Event event) => event.isRecurring
+      ? '${event.eventId}@${event.startDate.toUtc().millisecondsSinceEpoch}'
+      : event.eventId;
+
+  CalendarEvent _toCalendarEvent(
+    dcp.Event event, {
+    required DeviceCalendarInfo? calendar,
+    required DateTime syncedAt,
+  }) {
     return CalendarEvent(
-      id: event.eventId,
+      id: firestoreIdFor(event),
       title: event.title,
       notes: event.description ?? '',
       startAt: event.startDate.toUtc(),
@@ -115,6 +177,8 @@ class IosCalendarRepositoryImpl extends IosCalendarRepository {
         eventIdentifier: event.eventId,
         calendarId: event.calendarId,
       ),
+      calendarName: calendar?.name,
+      colorHex: event.colorHex ?? calendar?.colorHex,
       lastModifiedAt: syncedAt,
       lastModifiedBy: EventSource.ios,
     );

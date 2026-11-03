@@ -17,10 +17,8 @@ class FirestoreEventRepositoryImpl implements FirestoreEventRepository {
   final String familyId;
   final FirebaseFirestore _firestore;
 
-  CollectionReference<Map<String, dynamic>> get _events => _firestore
-      .collection('families')
-      .doc(familyId)
-      .collection('events');
+  CollectionReference<Map<String, dynamic>> get _events =>
+      _firestore.collection('families').doc(familyId).collection('events');
 
   @override
   Stream<List<CalendarEvent>> watchEvents() {
@@ -37,6 +35,12 @@ class FirestoreEventRepositoryImpl implements FirestoreEventRepository {
   }
 
   @override
+  Future<CalendarEvent?> findById(String id) async {
+    final doc = await _events.doc(id).get();
+    return doc.exists ? _fromData(doc.id, doc.data()!) : null;
+  }
+
+  @override
   Future<CalendarEvent?> findByExternalId({
     required EventSource source,
     required String externalId,
@@ -44,8 +48,10 @@ class FirestoreEventRepositoryImpl implements FirestoreEventRepository {
     final field = source == EventSource.ios
         ? 'external.ios.eventIdentifier'
         : 'external.outlook.eventIdentifier';
-    final snapshot =
-        await _events.where(field, isEqualTo: externalId).limit(1).get();
+    final snapshot = await _events
+        .where(field, isEqualTo: externalId)
+        .limit(1)
+        .get();
     if (snapshot.docs.isEmpty) return null;
     return _fromDoc(snapshot.docs.first);
   }
@@ -71,29 +77,33 @@ class FirestoreEventRepositoryImpl implements FirestoreEventRepository {
       : ExternalRef.fromJson(Map<String, dynamic>.from(value as Map));
 
   Map<String, dynamic> _toMap(CalendarEvent event) => {
-        'title': event.title,
-        'notes': event.notes,
-        'startAt': Timestamp.fromDate(event.startAt),
-        'endAt': Timestamp.fromDate(event.endAt),
-        'isAllDay': event.isAllDay,
-        'timeZone': event.timeZone,
-        'source': event.source.name,
-        'createdByUid': event.createdByUid,
-        'originDeviceId': event.originDeviceId,
-        'external': {
-          'ios': _refToMap(event.iosRef),
-          'outlook': _refToMap(event.outlookRef),
-        },
-        'lastModifiedAt': Timestamp.fromDate(event.lastModifiedAt),
-        'lastModifiedBy': event.lastModifiedBy.name,
-        'deleted': event.deleted,
-      };
+    'title': event.title,
+    'notes': event.notes,
+    'startAt': Timestamp.fromDate(event.startAt),
+    'endAt': Timestamp.fromDate(event.endAt),
+    'isAllDay': event.isAllDay,
+    'timeZone': event.timeZone,
+    'source': event.source.name,
+    'createdByUid': event.createdByUid,
+    'originDeviceId': event.originDeviceId,
+    'external': {
+      'ios': _refToMap(event.iosRef),
+      'outlook': _refToMap(event.outlookRef),
+    },
+    'calendar': {'name': event.calendarName, 'colorHex': event.colorHex},
+    'lastModifiedAt': Timestamp.fromDate(event.lastModifiedAt),
+    'lastModifiedBy': event.lastModifiedBy.name,
+    'deleted': event.deleted,
+  };
 
-  CalendarEvent _fromDoc(QueryDocumentSnapshot<Map<String, dynamic>> doc) {
-    final data = doc.data();
+  CalendarEvent _fromDoc(QueryDocumentSnapshot<Map<String, dynamic>> doc) =>
+      _fromData(doc.id, doc.data());
+
+  CalendarEvent _fromData(String id, Map<String, dynamic> data) {
     final external = data['external'] as Map<String, dynamic>?;
+    final calendar = data['calendar'] as Map<String, dynamic>?;
     return CalendarEvent(
-      id: doc.id,
+      id: id,
       title: data['title'] as String,
       notes: data['notes'] as String? ?? '',
       startAt: (data['startAt'] as Timestamp).toDate(),
@@ -105,8 +115,12 @@ class FirestoreEventRepositoryImpl implements FirestoreEventRepository {
       originDeviceId: data['originDeviceId'] as String?,
       iosRef: _refFromMap(external?['ios']),
       outlookRef: _refFromMap(external?['outlook']),
+      calendarName: calendar?['name'] as String?,
+      colorHex: calendar?['colorHex'] as String?,
       lastModifiedAt: (data['lastModifiedAt'] as Timestamp).toDate(),
-      lastModifiedBy: EventSource.values.byName(data['lastModifiedBy'] as String),
+      lastModifiedBy: EventSource.values.byName(
+        data['lastModifiedBy'] as String,
+      ),
       deleted: data['deleted'] as bool? ?? false,
     );
   }

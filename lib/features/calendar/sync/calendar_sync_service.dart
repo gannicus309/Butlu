@@ -45,30 +45,100 @@ class CalendarSyncService {
     final start = _now().subtract(_windowPast);
     final end = _now().add(_windowFuture);
 
+    final iosAllowed = await ios.hasPermission();
     final iosEvents = await ios.fetchWindow(start, end);
     final outlookEvents = await outlook?.fetchWindow(start, end) ?? const [];
 
+    final seenIosDocIds = <String>{};
     for (final event in [...iosEvents, ...outlookEvents]) {
-      await _ingestExternalEvent(event);
+      final docId = await _ingestExternalEvent(event);
+      if (docId != null && event.source == EventSource.ios) {
+        seenIosDocIds.add(docId);
+      }
+    }
+
+    // Without permission the fetch is empty by necessity, not because the
+    // user deleted everything -- cleaning up then would wipe their calendar.
+    if (iosAllowed) {
+      await _removeVanishedIosImports(seenIosDocIds, start, end);
     }
 
     await _pushPendingButluChanges();
   }
 
-  Future<void> _ingestExternalEvent(CalendarEvent incoming) async {
+  /// Ingests one externally fetched event and returns the id of the Firestore
+  /// document it now corresponds to (null if it was malformed).
+  Future<String?> _ingestExternalEvent(CalendarEvent incoming) async {
     final externalId = incoming.refFor(incoming.source)?.eventIdentifier;
-    if (externalId == null) return; // Malformed fetch result; ignore.
+    if (externalId == null) return null; // Malformed fetch result; ignore.
 
-    final existing = await firestore.findByExternalId(
-      source: incoming.source,
-      externalId: externalId,
-    );
+    final existing = await _findExisting(incoming, externalId);
 
     if (existing == null) {
       await firestore.upsert(incoming);
-      return;
+      return incoming.id;
     }
 
+    if (existing.deleted) {
+      // An iOS import that was cleaned up -- its calendar switched off, say --
+      // is back in the fetch, so restore it. A Butlu event deleted inside
+      // Butlu stays deleted even though its pushed iOS copy still exists.
+      if (existing.source == EventSource.ios) await firestore.upsert(incoming);
+      return existing.id;
+    }
+
+    await _mergeInto(existing, incoming);
+    return existing.id;
+  }
+
+  Future<CalendarEvent?> _findExisting(
+    CalendarEvent incoming,
+    String externalId,
+  ) async {
+    final byId = await firestore.findById(incoming.id);
+    if (byId != null) return byId;
+    final byExternalId = await firestore.findByExternalId(
+      source: incoming.source,
+      externalId: externalId,
+    );
+    // For iOS, every occurrence of a repeating event shares one external id,
+    // so an external-id match is only trusted for a Butlu event this engine
+    // pushed out itself (those are never recurring); imported iOS events are
+    // always found by their per-occurrence document id above.
+    if (incoming.source == EventSource.ios &&
+        byExternalId?.source != EventSource.butlu) {
+      return null;
+    }
+    return byExternalId;
+  }
+
+  /// Soft-deletes events this phone imported from iOS that no longer come
+  /// back in the fetch: deleted or moved in iOS Calendar, or from a calendar
+  /// the user has since switched off. Only this phone's own imports, inside
+  /// the sync window, that haven't been edited in Butlu since.
+  Future<void> _removeVanishedIosImports(
+    Set<String> seen,
+    DateTime start,
+    DateTime end,
+  ) async {
+    for (final event in await firestore.fetchAll()) {
+      if (event.deleted ||
+          event.source != EventSource.ios ||
+          event.lastModifiedBy != EventSource.ios ||
+          event.createdByUid != ios.ownerUid ||
+          event.startAt.isBefore(start) ||
+          !event.startAt.isBefore(end) ||
+          seen.contains(event.id)) {
+        continue;
+      }
+      await firestore.softDelete(event.id);
+    }
+  }
+
+  Future<void> _mergeInto(
+    CalendarEvent existing,
+    CalendarEvent incoming,
+  ) async {
     // EventKit (via device_calendar_plus) exposes no last-modified timestamp,
     // so the iOS repository stamps every fetch with the current sync time --
     // meaning "is incoming newer" is nearly always true for iOS and would
@@ -97,24 +167,37 @@ class CalendarSyncService {
       endAt: incoming.endAt,
       isAllDay: incoming.isAllDay,
       timeZone: incoming.timeZone,
-      iosRef:
-          incoming.source == EventSource.ios ? incoming.iosRef : existing.iosRef,
+      iosRef: incoming.source == EventSource.ios
+          ? incoming.iosRef
+          : existing.iosRef,
       outlookRef: incoming.source == EventSource.outlook
           ? incoming.outlookRef
           : existing.outlookRef,
+      calendarName: existing.source == EventSource.ios
+          ? incoming.calendarName
+          : existing.calendarName,
+      colorHex: existing.source == EventSource.ios
+          ? incoming.colorHex
+          : existing.colorHex,
       lastModifiedAt: incoming.lastModifiedAt,
       lastModifiedBy: incoming.source,
     );
     await firestore.upsert(merged);
   }
 
+  /// [a] is the incoming external copy, [b] the stored one.
   bool _hasSameContent(CalendarEvent a, CalendarEvent b) {
     return a.title == b.title &&
         a.notes == b.notes &&
         a.startAt == b.startAt &&
         a.endAt == b.endAt &&
         a.isAllDay == b.isAllDay &&
-        a.timeZone == b.timeZone;
+        a.timeZone == b.timeZone &&
+        // Which calendar an event sits in only matters for iOS imports; a
+        // Butlu event pushed into iOS coming back tagged with the default
+        // calendar's name is not an edit.
+        (b.source != EventSource.ios ||
+            (a.calendarName == b.calendarName && a.colorHex == b.colorHex));
   }
 
   Future<void> _pushPendingButluChanges() async {
@@ -128,7 +211,11 @@ class CalendarSyncService {
       updated = await _pushToTarget(updated, ios, updated.iosRef);
       final outlookTarget = outlook;
       if (outlookTarget != null) {
-        updated = await _pushToTarget(updated, outlookTarget, updated.outlookRef);
+        updated = await _pushToTarget(
+          updated,
+          outlookTarget,
+          updated.outlookRef,
+        );
       }
       if (!identical(updated, event)) {
         await firestore.upsert(updated);
@@ -145,8 +232,9 @@ class CalendarSyncService {
       final ref = await target.createEvent(event);
       return event.copyWith(
         iosRef: target.source == EventSource.ios ? ref : event.iosRef,
-        outlookRef:
-            target.source == EventSource.outlook ? ref : event.outlookRef,
+        outlookRef: target.source == EventSource.outlook
+            ? ref
+            : event.outlookRef,
       );
     }
     await target.updateEvent(existingRef, event);

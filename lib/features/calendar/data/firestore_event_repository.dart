@@ -9,6 +9,8 @@ abstract class FirestoreEventRepository {
 
   Future<List<CalendarEvent>> fetchAll();
 
+  Future<CalendarEvent?> findById(String id);
+
   Future<CalendarEvent?> findByExternalId({
     required EventSource source,
     required String externalId,

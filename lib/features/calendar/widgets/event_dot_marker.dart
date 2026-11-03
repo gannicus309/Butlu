@@ -14,7 +14,20 @@ Color colorForSource(EventSource source) {
   }
 }
 
-/// Small dots under a month-grid day cell, one per distinct event source
+/// Parses `#RRGGBB` (as iOS reports calendar colours); null if absent/bad.
+Color? colorFromHex(String? hex) {
+  if (hex == null) return null;
+  final value = int.tryParse(hex.replaceFirst('#', ''), radix: 16);
+  if (value == null || hex.length != 7) return null;
+  return Color(0xFF000000 | value);
+}
+
+/// The event's own calendar colour when it came from a phone calendar (so a
+/// spouse's shared calendar reads as theirs), else its source's colour.
+Color colorForEvent(CalendarEvent event) =>
+    colorFromHex(event.colorHex) ?? colorForSource(event.source);
+
+/// Small dots under a month-grid day cell, one per distinct calendar colour
 /// present that day -- mirrors iOS Calendar's day markers.
 class EventDotMarkers extends StatelessWidget {
   const EventDotMarkers({super.key, required this.events});
@@ -24,22 +37,18 @@ class EventDotMarkers extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (events.isEmpty) return const SizedBox.shrink();
-    final sources = events.map((e) => e.source).toSet().toList()
-      ..sort((a, b) => a.index.compareTo(b.index));
+    final colors = events.map(colorForEvent).toSet();
 
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        for (final source in sources.take(3))
+        for (final color in colors.take(3))
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 1),
             child: Container(
               width: 5,
               height: 5,
-              decoration: BoxDecoration(
-                color: colorForSource(source),
-                shape: BoxShape.circle,
-              ),
+              decoration: BoxDecoration(color: color, shape: BoxShape.circle),
             ),
           ),
       ],

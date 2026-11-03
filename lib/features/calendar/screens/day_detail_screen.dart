@@ -74,9 +74,9 @@ class DayDetailScreen extends ConsumerWidget {
               icon: Icons.event_available_outlined,
               message: 'No events this day',
             )
-          : ListView.separated(
+          : ListView.builder(
+              padding: const EdgeInsets.only(top: 8, bottom: 96),
               itemCount: events.length,
-              separatorBuilder: (context, index) => const Divider(height: 1),
               itemBuilder: (context, index) => FadeSlideIn(
                 delay: FadeSlideIn.staggerDelay(index),
                 child: EventListTile(event: events[index]),

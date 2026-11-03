@@ -14,16 +14,16 @@ class ExternalRef {
   });
 
   Map<String, dynamic> toJson() => {
-        'eventIdentifier': eventIdentifier,
-        'calendarId': calendarId,
-        'changeKey': changeKey,
-      };
+    'eventIdentifier': eventIdentifier,
+    'calendarId': calendarId,
+    'changeKey': changeKey,
+  };
 
   factory ExternalRef.fromJson(Map<String, dynamic> json) => ExternalRef(
-        eventIdentifier: json['eventIdentifier'] as String,
-        calendarId: json['calendarId'] as String?,
-        changeKey: json['changeKey'] as String?,
-      );
+    eventIdentifier: json['eventIdentifier'] as String,
+    calendarId: json['calendarId'] as String?,
+    changeKey: json['changeKey'] as String?,
+  );
 }
 
 /// Unified event model shared by the Firestore store and both external
@@ -41,6 +41,12 @@ class CalendarEvent {
   final String? originDeviceId;
   final ExternalRef? iosRef;
   final ExternalRef? outlookRef;
+
+  /// Name and `#RRGGBB` colour of the phone calendar an iOS event came from
+  /// (e.g. a spouse's shared iCloud calendar), so the UI can show whose event
+  /// it is. Null for Butlu-native and Outlook events.
+  final String? calendarName;
+  final String? colorHex;
   final DateTime lastModifiedAt;
   final EventSource lastModifiedBy;
   final bool deleted;
@@ -58,6 +64,8 @@ class CalendarEvent {
     this.originDeviceId,
     this.iosRef,
     this.outlookRef,
+    this.calendarName,
+    this.colorHex,
     required this.lastModifiedAt,
     required this.lastModifiedBy,
     this.deleted = false,
@@ -84,6 +92,8 @@ class CalendarEvent {
     EventSource? source,
     ExternalRef? iosRef,
     ExternalRef? outlookRef,
+    String? calendarName,
+    String? colorHex,
     DateTime? lastModifiedAt,
     EventSource? lastModifiedBy,
     bool? deleted,
@@ -101,6 +111,8 @@ class CalendarEvent {
       originDeviceId: originDeviceId,
       iosRef: iosRef ?? this.iosRef,
       outlookRef: outlookRef ?? this.outlookRef,
+      calendarName: calendarName ?? this.calendarName,
+      colorHex: colorHex ?? this.colorHex,
       lastModifiedAt: lastModifiedAt ?? this.lastModifiedAt,
       lastModifiedBy: lastModifiedBy ?? this.lastModifiedBy,
       deleted: deleted ?? this.deleted,

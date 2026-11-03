@@ -8,6 +8,7 @@ import 'features/auth/providers/auth_providers.dart';
 import 'features/auth/screens/family_setup_screen.dart';
 import 'features/auth/screens/sign_in_screen.dart';
 import 'firebase_options.dart';
+import 'shared/widgets/butlu_logo.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -29,9 +30,8 @@ class ButluRoot extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final authState = ref.watch(authStateProvider);
     return authState.when(
-      data: (user) => user == null
-          ? _wrapPlain(const SignInScreen())
-          : const _FamilyGate(),
+      data: (user) =>
+          user == null ? _wrapPlain(const SignInScreen()) : const _FamilyGate(),
       loading: () => _wrapPlain(const _LoadingScreen()),
       error: (error, stackTrace) => _wrapPlain(_ErrorScreen(error: error)),
     );
@@ -47,9 +47,9 @@ class _FamilyGate extends ConsumerWidget {
     return status.when(
       data: (status) => switch (status) {
         FamilyStatusMember(familyId: final familyId) => ProviderScope(
-            overrides: [familyIdProvider.overrideWithValue(familyId)],
-            child: const ButluApp(),
-          ),
+          overrides: [familyIdProvider.overrideWithValue(familyId)],
+          child: const ButluApp(),
+        ),
         _ => _wrapPlain(FamilySetupScreen(status: status)),
       },
       loading: () => _wrapPlain(const _LoadingScreen()),
@@ -63,7 +63,7 @@ class _LoadingScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    return const Scaffold(body: Center(child: ButluLogo(pulse: true)));
   }
 }
 

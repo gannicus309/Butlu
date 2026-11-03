@@ -3,6 +3,7 @@ import 'package:butlu/features/calendar/data/firestore_event_repository.dart';
 import 'package:butlu/features/calendar/data/ios_calendar_repository.dart';
 import 'package:butlu/features/calendar/data/outlook_calendar_repository.dart';
 import 'package:butlu/features/calendar/models/calendar_event.dart';
+import 'package:butlu/features/calendar/models/device_calendar_info.dart';
 import 'package:butlu/features/calendar/models/event_source.dart';
 import 'package:butlu/features/calendar/sync/calendar_sync_service.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -16,6 +17,9 @@ class FakeFirestoreEventRepository implements FirestoreEventRepository {
 
   @override
   Future<List<CalendarEvent>> fetchAll() async => store.values.toList();
+
+  @override
+  Future<CalendarEvent?> findById(String id) async => store[id];
 
   @override
   Future<CalendarEvent?> findByExternalId({
@@ -76,8 +80,16 @@ class FakeExternalRepository
   @override
   Future<void> deleteEvent(ExternalRef ref) async {}
 
+  bool permission = true;
+
   @override
-  Future<bool> hasPermission() async => true;
+  Future<bool> hasPermission() async => permission;
+
+  @override
+  Future<List<DeviceCalendarInfo>> listCalendars() async => const [];
+
+  @override
+  String get ownerUid => 'uid-1';
 
   @override
   Future<bool> requestPermission() async => true;
@@ -91,8 +103,7 @@ class FakeExternalRepository
   @override
   Future<({List<CalendarEvent> events, String nextDeltaLink})> fetchDelta(
     String deltaLink,
-  ) async =>
-      (events: windowResult, nextDeltaLink: deltaLink);
+  ) async => (events: windowResult, nextDeltaLink: deltaLink);
 
   @override
   Future<String> fetchInitialDeltaLink(DateTime start, DateTime end) async =>
@@ -108,8 +119,10 @@ CalendarEvent _event({
   ExternalRef? iosRef,
   ExternalRef? outlookRef,
   bool deleted = false,
+  DateTime? start,
+  String? calendarName,
 }) {
-  final start = DateTime.utc(2026, 9, 1, 10);
+  start ??= DateTime.utc(2026, 9, 1, 10);
   return CalendarEvent(
     id: id,
     title: title,
@@ -120,6 +133,7 @@ CalendarEvent _event({
     createdByUid: 'uid-1',
     iosRef: iosRef,
     outlookRef: outlookRef,
+    calendarName: calendarName,
     lastModifiedAt: lastModifiedAt,
     lastModifiedBy: lastModifiedBy,
     deleted: deleted,
@@ -248,48 +262,46 @@ void main() {
     expect(firestore.store['doc-1']!.title, 'Edited in Butlu');
   });
 
-  test(
-    'an event just pulled from Outlook is not echoed back out to iOS in the same cycle',
-    () async {
-      outlook.windowResult = [
-        _event(
-          id: 'ext-1',
-          title: 'Dentist',
-          source: EventSource.outlook,
-          lastModifiedBy: EventSource.outlook,
-          lastModifiedAt: DateTime.utc(2026, 8, 20),
-          outlookRef: const ExternalRef(eventIdentifier: 'graph-1'),
-        ),
-      ];
-
-      await sync.runFullSync();
-
-      expect(ios.createdEvents, isEmpty);
-      expect(outlook.createdEvents, isEmpty);
-    },
-  );
-
-  test('a Butlu-native event is pushed out to both external calendars',
-      () async {
-    firestore.store['doc-1'] = _event(
-      id: 'doc-1',
-      title: 'Family dinner',
-      source: EventSource.butlu,
-      lastModifiedBy: EventSource.butlu,
-      lastModifiedAt: DateTime.utc(2026, 8, 30),
-    );
+  test('an event just pulled from Outlook is not echoed back out to iOS in the same cycle', () async {
+    outlook.windowResult = [
+      _event(
+        id: 'ext-1',
+        title: 'Dentist',
+        source: EventSource.outlook,
+        lastModifiedBy: EventSource.outlook,
+        lastModifiedAt: DateTime.utc(2026, 8, 20),
+        outlookRef: const ExternalRef(eventIdentifier: 'graph-1'),
+      ),
+    ];
 
     await sync.runFullSync();
 
-    expect(ios.createdEvents, hasLength(1));
-    expect(outlook.createdEvents, hasLength(1));
-    final stored = firestore.store['doc-1']!;
-    expect(stored.iosRef, isNotNull);
-    expect(stored.outlookRef, isNotNull);
+    expect(ios.createdEvents, isEmpty);
+    expect(outlook.createdEvents, isEmpty);
   });
 
-  test('editing an already-linked event inside Butlu pushes an update, not a create',
-      () async {
+  test(
+    'a Butlu-native event is pushed out to both external calendars',
+    () async {
+      firestore.store['doc-1'] = _event(
+        id: 'doc-1',
+        title: 'Family dinner',
+        source: EventSource.butlu,
+        lastModifiedBy: EventSource.butlu,
+        lastModifiedAt: DateTime.utc(2026, 8, 30),
+      );
+
+      await sync.runFullSync();
+
+      expect(ios.createdEvents, hasLength(1));
+      expect(outlook.createdEvents, hasLength(1));
+      final stored = firestore.store['doc-1']!;
+      expect(stored.iosRef, isNotNull);
+      expect(stored.outlookRef, isNotNull);
+    },
+  );
+
+  test('editing an already-linked event inside Butlu pushes an update, not a create', () async {
     firestore.store['doc-1'] = _event(
       id: 'doc-1',
       title: 'Rescheduled dinner',
@@ -307,4 +319,114 @@ void main() {
     expect(ios.updatedEvents, hasLength(1));
     expect(outlook.updatedEvents, hasLength(1));
   });
+
+  CalendarEvent iosImport(String id, String eventId, {DateTime? start}) =>
+      _event(
+        id: id,
+        title: 'Swimming',
+        source: EventSource.ios,
+        lastModifiedBy: EventSource.ios,
+        lastModifiedAt: DateTime.utc(2026, 9, 1),
+        iosRef: ExternalRef(eventIdentifier: eventId),
+        start: start,
+      );
+
+  test('each occurrence of a repeating iOS event gets its own entry', () async {
+    ios.windowResult = [
+      iosImport('swim@1', 'swim', start: DateTime.utc(2026, 9, 1, 17)),
+      iosImport('swim@2', 'swim', start: DateTime.utc(2026, 9, 8, 17)),
+      iosImport('swim@3', 'swim', start: DateTime.utc(2026, 9, 15, 17)),
+    ];
+
+    await sync.runFullSync();
+
+    expect(
+      firestore.store.keys,
+      unorderedEquals(['swim@1', 'swim@2', 'swim@3']),
+    );
+  });
+
+  test('an iOS event that disappears from the fetch is removed', () async {
+    firestore.store['gone'] = iosImport('gone', 'ios-gone');
+    firestore.store['kept'] = iosImport('kept', 'ios-kept');
+    ios.windowResult = [iosImport('kept', 'ios-kept')];
+
+    await sync.runFullSync();
+
+    expect(firestore.store['gone']!.deleted, isTrue);
+    expect(firestore.store['kept']!.deleted, isFalse);
+  });
+
+  test('nothing is removed when calendar access is not granted', () async {
+    firestore.store['doc-1'] = iosImport('doc-1', 'ios-1');
+    ios.permission = false;
+
+    await sync.runFullSync();
+
+    expect(firestore.store['doc-1']!.deleted, isFalse);
+  });
+
+  test(
+    'another family member\'s imports are never removed by this phone',
+    () async {
+      firestore.store['theirs'] = CalendarEvent(
+        id: 'theirs',
+        title: 'Their event',
+        startAt: DateTime.utc(2026, 9, 1, 10),
+        endAt: DateTime.utc(2026, 9, 1, 11),
+        timeZone: 'UTC',
+        source: EventSource.ios,
+        createdByUid: 'uid-2',
+        iosRef: const ExternalRef(eventIdentifier: 'their-ios'),
+        lastModifiedAt: DateTime.utc(2026, 9, 1),
+        lastModifiedBy: EventSource.ios,
+      );
+
+      await sync.runFullSync();
+
+      expect(firestore.store['theirs']!.deleted, isFalse);
+    },
+  );
+
+  test('a removed iOS import comes back when it reappears', () async {
+    firestore.store['doc-1'] = iosImport(
+      'doc-1',
+      'ios-1',
+    ).copyWith(deleted: true);
+    ios.windowResult = [iosImport('doc-1', 'ios-1')];
+
+    await sync.runFullSync();
+
+    expect(firestore.store['doc-1']!.deleted, isFalse);
+  });
+
+  test(
+    'a Butlu event pushed to iOS is not taken over when it comes back',
+    () async {
+      firestore.store['doc-1'] = _event(
+        id: 'doc-1',
+        title: 'Family dinner',
+        source: EventSource.butlu,
+        lastModifiedBy: EventSource.butlu,
+        lastModifiedAt: DateTime.utc(2026, 8, 30),
+        iosRef: const ExternalRef(eventIdentifier: 'ios-1'),
+      );
+      ios.windowResult = [
+        _event(
+          id: 'ios-1',
+          title: 'Family dinner',
+          source: EventSource.ios,
+          lastModifiedBy: EventSource.ios,
+          lastModifiedAt: DateTime.utc(2026, 9, 1),
+          iosRef: const ExternalRef(eventIdentifier: 'ios-1'),
+          calendarName: 'Home',
+        ),
+      ];
+
+      await sync.runFullSync();
+
+      expect(firestore.store.keys, ['doc-1']);
+      expect(firestore.store['doc-1']!.lastModifiedBy, EventSource.butlu);
+    },
+  );
 }

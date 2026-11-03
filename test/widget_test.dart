@@ -1,6 +1,8 @@
 import 'package:butlu/features/auth/providers/auth_providers.dart';
 import 'package:butlu/features/calendar/data/firestore_event_repository.dart';
+import 'package:butlu/features/calendar/data/ios_calendar_repository.dart';
 import 'package:butlu/features/calendar/models/calendar_event.dart';
+import 'package:butlu/features/calendar/models/device_calendar_info.dart';
 import 'package:butlu/features/calendar/models/event_source.dart';
 import 'package:butlu/features/calendar/providers/calendar_providers.dart';
 import 'package:butlu/main.dart';
@@ -22,11 +24,13 @@ class _FakeFirestoreEventRepository implements FirestoreEventRepository {
   Future<List<CalendarEvent>> fetchAll() async => events;
 
   @override
+  Future<CalendarEvent?> findById(String id) async => null;
+
+  @override
   Future<CalendarEvent?> findByExternalId({
     required EventSource source,
     required String externalId,
-  }) async =>
-      null;
+  }) async => null;
 
   @override
   Future<void> upsert(CalendarEvent event) async {}
@@ -53,22 +57,54 @@ List<CalendarEvent> _sampleEvents() {
   ];
 }
 
+class _NoCalendarAccess extends IosCalendarRepository {
+  @override
+  String get ownerUid => 'sample-uid';
+
+  @override
+  Future<bool> hasPermission() async => false;
+
+  @override
+  Future<bool> requestPermission() async => false;
+
+  @override
+  Future<List<DeviceCalendarInfo>> listCalendars() async => const [];
+
+  @override
+  Future<List<CalendarEvent>> fetchWindow(DateTime start, DateTime end) async =>
+      const [];
+
+  @override
+  Future<ExternalRef> createEvent(CalendarEvent event) async =>
+      const ExternalRef(eventIdentifier: 'unused');
+
+  @override
+  Future<void> updateEvent(ExternalRef ref, CalendarEvent event) async {}
+
+  @override
+  Future<void> deleteEvent(ExternalRef ref) async {}
+}
+
 void main() {
   Widget appWithFakeData() {
     return ProviderScope(
       overrides: [
-        firestoreEventRepositoryProvider
-            .overrideWithValue(_FakeFirestoreEventRepository(_sampleEvents())),
+        firestoreEventRepositoryProvider.overrideWithValue(
+          _FakeFirestoreEventRepository(_sampleEvents()),
+        ),
         // AccountAvatarButton reads this; without an override it hits real
         // FirebaseAuth, which was never initialized in a widget test.
         authStateProvider.overrideWith((ref) => Stream.value(null)),
+        // The Calendar tab syncs on open; keep the real EventKit plugin out.
+        iosCalendarRepositoryProvider.overrideWithValue(_NoCalendarAccess()),
       ],
       child: const ButluApp(),
     );
   }
 
-  testWidgets('shows the Calendar tab with all five nav destinations',
-      (WidgetTester tester) async {
+  testWidgets('shows the Calendar tab with all five nav destinations', (
+    WidgetTester tester,
+  ) async {
     await tester.pumpWidget(appWithFakeData());
     await tester.pumpAndSettle();
 
@@ -79,8 +115,9 @@ void main() {
     expect(find.text('More'), findsOneWidget);
   });
 
-  testWidgets('tapping a day with events opens its day-detail list',
-      (WidgetTester tester) async {
+  testWidgets('tapping a day with events opens its day-detail list', (
+    WidgetTester tester,
+  ) async {
     await tester.pumpWidget(appWithFakeData());
     await tester.pumpAndSettle();
 

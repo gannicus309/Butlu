@@ -8,6 +8,7 @@ import '../data/ios_calendar_repository.dart';
 import '../data/ios_calendar_repository_impl.dart';
 import '../models/calendar_event.dart';
 import '../sync/calendar_sync_service.dart';
+import 'calendar_selection_provider.dart';
 
 DateTime _dateOnly(DateTime d) => DateTime(d.year, d.month, d.day);
 
@@ -17,13 +18,12 @@ DateTime _dateOnly(DateTime d) => DateTime(d.year, d.month, d.day);
 // that in `dependencies`, or Riverpod resolves it against the wrong
 // (unscoped, root) container and throws a "read from a place where one of
 // its dependencies were overridden" assertion.
-final firestoreEventRepositoryProvider = Provider<FirestoreEventRepository>(
-  (ref) {
-    final familyId = ref.watch(familyIdProvider);
-    return FirestoreEventRepositoryImpl(familyId: familyId);
-  },
-  dependencies: [familyIdProvider],
-);
+final firestoreEventRepositoryProvider = Provider<FirestoreEventRepository>((
+  ref,
+) {
+  final familyId = ref.watch(familyIdProvider);
+  return FirestoreEventRepositoryImpl(familyId: familyId);
+}, dependencies: [familyIdProvider]);
 
 /// The shared family's live event stream. Overridden in widget tests with a
 /// fake repository so the UI is testable without a real Firebase project.
@@ -38,22 +38,19 @@ final selectedDayProvider = StateProvider<DateTime?>((ref) => null);
 
 /// Events grouped by calendar day (local time, midnight-keyed) -- the shape
 /// `table_calendar`'s `eventLoader` and the day-detail screen both want.
-final eventsByDayProvider = Provider<Map<DateTime, List<CalendarEvent>>>(
-  (ref) {
-    final events = ref.watch(eventsProvider).value ?? const [];
-    final map = <DateTime, List<CalendarEvent>>{};
-    for (final event in events) {
-      if (event.deleted) continue;
-      final key = _dateOnly(event.startAt.toLocal());
-      map.putIfAbsent(key, () => []).add(event);
-    }
-    for (final list in map.values) {
-      list.sort((a, b) => a.startAt.compareTo(b.startAt));
-    }
-    return map;
-  },
-  dependencies: [eventsProvider],
-);
+final eventsByDayProvider = Provider<Map<DateTime, List<CalendarEvent>>>((ref) {
+  final events = ref.watch(eventsProvider).value ?? const [];
+  final map = <DateTime, List<CalendarEvent>>{};
+  for (final event in events) {
+    if (event.deleted) continue;
+    final key = _dateOnly(event.startAt.toLocal());
+    map.putIfAbsent(key, () => []).add(event);
+  }
+  for (final list in map.values) {
+    list.sort((a, b) => a.startAt.compareTo(b.startAt));
+  }
+  return map;
+}, dependencies: [eventsProvider]);
 
 final eventsForDayProvider = Provider.family<List<CalendarEvent>, DateTime>(
   (ref, day) => ref.watch(eventsByDayProvider)[_dateOnly(day)] ?? const [],
@@ -62,17 +59,29 @@ final eventsForDayProvider = Provider.family<List<CalendarEvent>, DateTime>(
 
 final iosCalendarRepositoryProvider = Provider<IosCalendarRepository>((ref) {
   final uid = ref.watch(authStateProvider).value?.uid ?? '';
-  return IosCalendarRepositoryImpl(currentUid: uid);
+  return IosCalendarRepositoryImpl(
+    currentUid: uid,
+    excludedCalendarIds: ref.watch(calendarSelectionProvider),
+  );
 });
 
 /// No `outlook` repository yet -- see [CalendarSyncService]'s doc comment on
-/// why that's fine for now. Manually triggered (see the Calendar tab's
-/// refresh button) rather than run automatically, since it can't be
-/// exercised without a real iOS device/simulator to test against.
+/// why that's fine for now. Run by the Calendar tab when it opens, when the
+/// app comes back to the foreground, after the calendar picker changes, and
+/// from its sync button.
+/// The phone's calendars, for the picker. Re-fetched each time the picker
+/// opens (autoDispose), so a newly accepted shared calendar shows up.
+final deviceCalendarsProvider = FutureProvider.autoDispose(
+  (ref) => ref.watch(iosCalendarRepositoryProvider).listCalendars(),
+);
+
 final calendarSyncServiceProvider = Provider<CalendarSyncService>(
   (ref) => CalendarSyncService(
     firestore: ref.watch(firestoreEventRepositoryProvider),
     ios: ref.watch(iosCalendarRepositoryProvider),
   ),
-  dependencies: [firestoreEventRepositoryProvider, iosCalendarRepositoryProvider],
+  dependencies: [
+    firestoreEventRepositoryProvider,
+    iosCalendarRepositoryProvider,
+  ],
 );

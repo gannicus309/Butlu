@@ -43,6 +43,8 @@
 	<string>Butlu reads and writes your iOS Calendar events so it can keep your family calendar in sync.</string>
 	<key>NSCalendarsFullAccessUsageDescription</key>
 	<string>Butlu reads and writes your iOS Calendar events so it can keep your family calendar in sync.</string>
+	<key>NSFaceIDUsageDescription</key>
+	<string>Butlu uses Face ID to keep your Vault notes private.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

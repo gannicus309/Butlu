@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../shared/google_sign_in_button.dart';
+import '../../../shared/widgets/butlu_logo.dart';
+import '../../../shared/widgets/fade_slide_in.dart';
 import '../providers/auth_providers.dart';
 
 /// Initializes Google Sign-In once, ahead of the button being shown -- both
@@ -40,29 +42,72 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
   Widget build(BuildContext context) {
     final init = ref.watch(_googleSignInInitProvider);
 
+    final scheme = Theme.of(context).colorScheme;
     return Scaffold(
-      body: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text('Butlu', style: Theme.of(context).textTheme.displaySmall),
-            const SizedBox(height: 8),
-            Text(
-              'Your shared family calendar',
-              style: Theme.of(context).textTheme.bodyMedium,
-            ),
-            const SizedBox(height: 32),
-            if (_error != null) ...[
-              Text(_error!, style: const TextStyle(color: Colors.redAccent)),
-              const SizedBox(height: 16),
+      body: DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: RadialGradient(
+            center: const Alignment(0, -0.45),
+            radius: 1.1,
+            // Pre-blended to an opaque colour: a translucent stop fades through
+            // murky grey on its way to the opaque surface colour.
+            colors: [
+              Color.alphaBlend(
+                scheme.primary.withValues(alpha: 0.16),
+                scheme.surface,
+              ),
+              scheme.surface,
             ],
-            init.when(
-              data: (_) => _buildSignInButton(),
-              loading: () => const CircularProgressIndicator(),
-              error: (e, st) =>
-                  Text('Sign-in unavailable: $e', style: const TextStyle(color: Colors.redAccent)),
+          ),
+        ),
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 32),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const FadeSlideIn(child: ButluLogo(size: 96)),
+                const SizedBox(height: 28),
+                FadeSlideIn(
+                  delay: const Duration(milliseconds: 120),
+                  child: Text(
+                    'Butlu',
+                    style: Theme.of(context).textTheme.displaySmall,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                FadeSlideIn(
+                  delay: const Duration(milliseconds: 200),
+                  child: Text(
+                    'Your shared family calendar',
+                    style: Theme.of(context).textTheme.bodyLarge
+                        ?.copyWith(color: scheme.onSurfaceVariant),
+                  ),
+                ),
+                const SizedBox(height: 40),
+                if (_error != null)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 16),
+                    child: Text(
+                      _error!,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: scheme.error),
+                    ),
+                  ),
+                FadeSlideIn(
+                  delay: const Duration(milliseconds: 320),
+                  child: init.when(
+                    data: (_) => _buildSignInButton(),
+                    loading: () => const CircularProgressIndicator(),
+                    error: (e, st) => Text(
+                      'Sign-in unavailable: $e',
+                      style: TextStyle(color: scheme.error),
+                    ),
+                  ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );
