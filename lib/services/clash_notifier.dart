@@ -29,9 +29,13 @@ class ClashNotifier {
 
   bool _ready = false;
 
-  /// [onOpenDay] is called with the clash's day when a notification is
-  /// tapped.
-  Future<void> init({required void Function(DateTime day) onOpenDay}) async {
+  /// Sets up the app's notifications, clash and pantry alike: [onOpenDay]
+  /// is called with the day when a clash notification is tapped, and
+  /// [onOpenInventory] when a use-soon reminder is.
+  Future<void> init({
+    required void Function(DateTime day) onOpenDay,
+    required VoidCallback onOpenInventory,
+  }) async {
     if (kIsWeb) return;
     await _plugin.initialize(
       settings: const InitializationSettings(
@@ -42,7 +46,9 @@ class ClashNotifier {
         ),
       ),
       onDidReceiveNotificationResponse: (response) {
-        final day = DateTime.tryParse(response.payload ?? '');
+        final payload = response.payload ?? '';
+        if (payload == 'inventory') return onOpenInventory();
+        final day = DateTime.tryParse(payload);
         if (day != null) onOpenDay(day);
       },
     );

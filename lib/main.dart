@@ -13,7 +13,9 @@ import 'features/auth/screens/sign_in_screen.dart';
 import 'features/calendar/providers/calendar_providers.dart';
 import 'features/calendar/providers/calendar_selection_provider.dart';
 import 'firebase_options.dart';
+import 'features/inventory/providers/inventory_providers.dart';
 import 'services/clash_notifier.dart';
+import 'services/expiry_notifier.dart';
 import 'shared/widgets/butlu_logo.dart';
 
 Future<void> main() async {
@@ -24,12 +26,16 @@ Future<void> main() async {
   await clashNotifier.init(
     onOpenDay: (day) =>
         appRouter.go('/calendar/day/${DateFormat('yyyy-MM-dd').format(day)}'),
+    onOpenInventory: () => appRouter.go('/inventory'),
   );
+  final expiryNotifier = ExpiryNotifier();
+  await expiryNotifier.init();
   runApp(
     ProviderScope(
       overrides: [
         sharedPreferencesProvider.overrideWithValue(prefs),
         clashNotifierProvider.overrideWithValue(clashNotifier),
+        expiryNotifierProvider.overrideWithValue(expiryNotifier),
       ],
       child: const ButluRoot(),
     ),

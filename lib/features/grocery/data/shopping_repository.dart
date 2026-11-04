@@ -42,6 +42,7 @@ class ShoppingRepository {
               item: _itemFrom(d.id, d.data()),
               lastUsedAt: _date(d.data()['lastUsedAt']) ?? DateTime.now(),
               lastBoughtAt: _date(d.data()['lastBoughtAt']),
+              putAwayAt: _date(d.data()['putAwayAt']),
               timesBought: (d.data()['timesBought'] as num?)?.toInt() ?? 0,
             ),
         ],

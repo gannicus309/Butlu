@@ -62,11 +62,25 @@ class GroceryHistoryEntry {
     required this.item,
     required this.lastUsedAt,
     this.lastBoughtAt,
+    this.putAwayAt,
     this.timesBought = 0,
   });
 
   final ShoppingItem item;
   final DateTime lastUsedAt;
   final DateTime? lastBoughtAt;
+
+  /// When it was last put into (or skipped for) the pantry inventory.
+  final DateTime? putAwayAt;
   final int timesBought;
+
+  /// Bought in the last week and not put away since -- what the inventory's
+  /// "Put away" prompt offers.
+  bool awaitingPutAway(DateTime now) {
+    final bought = lastBoughtAt;
+    if (bought == null) return false;
+    if (now.difference(bought) > const Duration(days: 7)) return false;
+    final putAway = putAwayAt;
+    return putAway == null || putAway.isBefore(bought);
+  }
 }

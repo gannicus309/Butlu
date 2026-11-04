@@ -11,6 +11,8 @@ import '../features/calendar/screens/month_view_screen.dart';
 import '../features/chores/screens/chores_screen.dart';
 import '../features/gemini/screens/gemini_chat_screen.dart';
 import '../features/grocery/screens/shopping_screen.dart';
+import '../features/inventory/providers/inventory_providers.dart';
+import '../features/inventory/screens/inventory_screen.dart';
 import '../features/meals/screens/meal_plan_screen.dart';
 import '../features/more/screens/more_screen.dart';
 import '../features/pickup/screens/pickup_screen.dart';
@@ -64,27 +66,16 @@ final GoRouter appRouter = GoRouter(
         StatefulShellBranch(
           routes: [
             GoRoute(
-              path: '/chores',
-              builder: (context, state) => const ChoresScreen(),
+              path: '/inventory',
+              builder: (context, state) => const InventoryScreen(),
             ),
           ],
         ),
         StatefulShellBranch(
           routes: [
             GoRoute(
-              path: '/vault',
-              builder: (context, state) => const VaultScreen(),
-              routes: [
-                GoRoute(
-                  path: 'new',
-                  builder: (context, state) => const NoteEditScreen(),
-                ),
-                GoRoute(
-                  path: 'note/:id',
-                  builder: (context, state) =>
-                      NoteEditScreen(noteId: state.pathParameters['id']),
-                ),
-              ],
+              path: '/chores',
+              builder: (context, state) => const ChoresScreen(),
             ),
           ],
         ),
@@ -110,6 +101,21 @@ final GoRouter appRouter = GoRouter(
                   path: 'gemini',
                   builder: (context, state) => const GeminiChatScreen(),
                 ),
+                GoRoute(
+                  path: 'vault',
+                  builder: (context, state) => const VaultScreen(),
+                  routes: [
+                    GoRoute(
+                      path: 'new',
+                      builder: (context, state) => const NoteEditScreen(),
+                    ),
+                    GoRoute(
+                      path: 'note/:id',
+                      builder: (context, state) =>
+                          NoteEditScreen(noteId: state.pathParameters['id']),
+                    ),
+                  ],
+                ),
               ],
             ),
           ],
@@ -124,10 +130,17 @@ class _AppShell extends ConsumerWidget {
 
   final StatefulNavigationShell navigationShell;
 
-  static const _vaultBranch = 3;
+  /// Vault lives under More, so leaving the More tab locks it.
+  static const _vaultBranch = 4;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Here rather than on the Inventory screen, which isn't built until its
+    // tab is first opened: reminders should follow the inventory from launch.
+    ref.listen(inventoryProvider, (previous, next) {
+      final items = next.value;
+      if (items != null) ref.read(expiryNotifierProvider).reschedule(items);
+    });
     return Scaffold(
       body: _FadeOnTabChange(
         index: navigationShell.currentIndex,
@@ -139,8 +152,8 @@ class _AppShell extends ConsumerWidget {
           if (index != navigationShell.currentIndex) {
             HapticFeedback.selectionClick();
           }
-          // Leaving the Vault tab locks it again, so it never sits open
-          // behind another tab.
+          // Leaving the More tab locks the Vault again (it lives under More),
+          // so it never sits open behind another tab.
           if (navigationShell.currentIndex == _vaultBranch &&
               index != _vaultBranch) {
             ref.read(vaultLockProvider.notifier).lock();
@@ -162,14 +175,14 @@ class _AppShell extends ConsumerWidget {
             label: 'Grocery',
           ),
           NavigationDestination(
+            icon: Icon(Icons.kitchen_outlined),
+            selectedIcon: Icon(Icons.kitchen),
+            label: 'Inventory',
+          ),
+          NavigationDestination(
             icon: Icon(Icons.checklist_outlined),
             selectedIcon: Icon(Icons.checklist),
             label: 'Chores',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.lock_outline),
-            selectedIcon: Icon(Icons.lock),
-            label: 'Vault',
           ),
           NavigationDestination(
             icon: Icon(Icons.more_horiz),

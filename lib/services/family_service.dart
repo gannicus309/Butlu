@@ -6,7 +6,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 /// be rejected server-side.
 class FamilyService {
   FamilyService({FirebaseFirestore? firestore})
-      : _firestore = firestore ?? FirebaseFirestore.instance;
+    : _firestore = firestore ?? FirebaseFirestore.instance;
 
   final FirebaseFirestore _firestore;
 
@@ -15,8 +15,10 @@ class FamilyService {
 
   /// The family this uid is already a member of, if any.
   Future<String?> findFamilyIdForMember(String uid) async {
-    final snapshot =
-        await _families.where('memberUids', arrayContains: uid).limit(1).get();
+    final snapshot = await _families
+        .where('memberUids', arrayContains: uid)
+        .limit(1)
+        .get();
     return snapshot.docs.isEmpty ? null : snapshot.docs.first.id;
   }
 

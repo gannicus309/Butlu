@@ -124,7 +124,7 @@ void main() {
     expect(find.text('Calendar'), findsWidgets);
     expect(find.text('Grocery'), findsOneWidget);
     expect(find.text('Chores'), findsOneWidget);
-    expect(find.text('Vault'), findsOneWidget);
+    expect(find.text('Inventory'), findsOneWidget);
     expect(find.text('More'), findsOneWidget);
   });
 
