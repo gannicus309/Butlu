@@ -46,6 +46,7 @@ class _NoteEditScreenState extends ConsumerState<NoteEditScreen> {
     final title = _titleController.text.trim();
     if (title.isEmpty) return;
     final repo = ref.read(vaultRepositoryProvider);
+    if (repo == null) return;
 
     if (widget.noteId == null) {
       final uid = ref.read(authStateProvider).value?.uid;
@@ -67,7 +68,7 @@ class _NoteEditScreenState extends ConsumerState<NoteEditScreen> {
 
   Future<void> _delete() async {
     if (widget.noteId == null) return;
-    await ref.read(vaultRepositoryProvider).deleteNote(widget.noteId!);
+    await ref.read(vaultRepositoryProvider)?.deleteNote(widget.noteId!);
     if (mounted) Navigator.of(context).pop();
   }
 

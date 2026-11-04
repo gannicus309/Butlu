@@ -19,6 +19,7 @@ import '../features/pickup/screens/pickup_screen.dart';
 import '../features/vault/screens/note_edit_screen.dart';
 import '../features/vault/providers/vault_lock_provider.dart';
 import '../features/vault/screens/vault_screen.dart';
+import 'theme.dart';
 
 final GlobalKey<NavigatorState> _rootNavigatorKey = GlobalKey<NavigatorState>();
 
@@ -130,6 +131,8 @@ class _AppShell extends ConsumerWidget {
 
   final StatefulNavigationShell navigationShell;
 
+  static final _tabThemes = [for (final c in kTabAccents) buildButluTheme(c)];
+
   /// Vault lives under More, so leaving the More tab locks it.
   static const _vaultBranch = 4;
 
@@ -141,55 +144,62 @@ class _AppShell extends ConsumerWidget {
       final items = next.value;
       if (items != null) ref.read(expiryNotifierProvider).reschedule(items);
     });
-    return Scaffold(
-      body: _FadeOnTabChange(
-        index: navigationShell.currentIndex,
-        child: navigationShell,
-      ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: navigationShell.currentIndex,
-        onDestinationSelected: (index) {
-          if (index != navigationShell.currentIndex) {
-            HapticFeedback.selectionClick();
-          }
-          // Leaving the More tab locks the Vault again (it lives under More),
-          // so it never sits open behind another tab.
-          if (navigationShell.currentIndex == _vaultBranch &&
-              index != _vaultBranch) {
-            ref.read(vaultLockProvider.notifier).lock();
-          }
-          navigationShell.goBranch(
-            index,
-            initialLocation: index == navigationShell.currentIndex,
-          );
-        },
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.calendar_today_outlined),
-            selectedIcon: Icon(Icons.calendar_today),
-            label: 'Calendar',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.shopping_cart_outlined),
-            selectedIcon: Icon(Icons.shopping_cart),
-            label: 'Grocery',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.kitchen_outlined),
-            selectedIcon: Icon(Icons.kitchen),
-            label: 'Inventory',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.checklist_outlined),
-            selectedIcon: Icon(Icons.checklist),
-            label: 'Chores',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.more_horiz),
-            selectedIcon: Icon(Icons.more_horiz),
-            label: 'More',
-          ),
-        ],
+    // The whole tab -- its screens and the tab bar -- takes on that tab's
+    // accent colour, blending over as you switch.
+    return AnimatedTheme(
+      data: _tabThemes[navigationShell.currentIndex],
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeOut,
+      child: Scaffold(
+        body: _FadeOnTabChange(
+          index: navigationShell.currentIndex,
+          child: navigationShell,
+        ),
+        bottomNavigationBar: NavigationBar(
+          selectedIndex: navigationShell.currentIndex,
+          onDestinationSelected: (index) {
+            if (index != navigationShell.currentIndex) {
+              HapticFeedback.selectionClick();
+            }
+            // Leaving the More tab locks the Vault again (it lives under More),
+            // so it never sits open behind another tab.
+            if (navigationShell.currentIndex == _vaultBranch &&
+                index != _vaultBranch) {
+              ref.read(vaultLockProvider.notifier).lock();
+            }
+            navigationShell.goBranch(
+              index,
+              initialLocation: index == navigationShell.currentIndex,
+            );
+          },
+          destinations: const [
+            NavigationDestination(
+              icon: Icon(Icons.calendar_today_outlined),
+              selectedIcon: Icon(Icons.calendar_today),
+              label: 'Calendar',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.shopping_cart_outlined),
+              selectedIcon: Icon(Icons.shopping_cart),
+              label: 'Grocery',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.kitchen_outlined),
+              selectedIcon: Icon(Icons.kitchen),
+              label: 'Inventory',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.checklist_outlined),
+              selectedIcon: Icon(Icons.checklist),
+              label: 'Chores',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.more_horiz),
+              selectedIcon: Icon(Icons.more_horiz),
+              label: 'More',
+            ),
+          ],
+        ),
       ),
     );
   }

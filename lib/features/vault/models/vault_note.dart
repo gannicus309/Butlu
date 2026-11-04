@@ -7,11 +7,15 @@ class VaultNote {
   final String createdByUid;
   final DateTime updatedAt;
 
+  /// Encrypted with a key this phone doesn't have, or damaged.
+  final bool unreadable;
+
   const VaultNote({
     required this.id,
     required this.title,
     required this.body,
     required this.createdByUid,
     required this.updatedAt,
+    this.unreadable = false,
   });
 }
