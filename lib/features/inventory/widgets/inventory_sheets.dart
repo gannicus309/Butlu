@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 
+import '../../../services/expiry_scanner.dart';
 import '../../grocery/models/catalog.dart';
 import '../../grocery/models/shopping_item.dart';
 import '../models/inventory_item.dart';
@@ -19,6 +21,76 @@ class ItemUsedUp extends ItemSheetResult {
 
   /// Also put it back on the shopping list.
   final bool addToList;
+}
+
+/// Photographs the pack and returns the date read off it, telling the user
+/// via a snackbar when it couldn't. Null if nothing was found or they
+/// backed out.
+Future<DateTime?> scanDate(
+  BuildContext context, {
+  bool fromLibrary = false,
+}) async {
+  final messenger = ScaffoldMessenger.of(context);
+  void say(String text) => messenger
+    ..hideCurrentSnackBar()
+    ..showSnackBar(SnackBar(persist: false, content: Text(text)));
+  final result = await scanExpiryDate(fromLibrary: fromLibrary);
+  switch (result) {
+    case ScanFound(:final date):
+      HapticFeedback.mediumImpact();
+      say('Found ${DateFormat.yMMMd().format(date)}');
+      return date;
+    case ScanNoDate(:final text):
+      say(
+        text.isEmpty
+            ? "Couldn't read any text. Try closer, with more light."
+            : "No date found in: ${text.take(4).join(' · ')}",
+      );
+      return null;
+    case ScanFailed(:final message):
+      say(message);
+      return null;
+    case null:
+      return null;
+  }
+}
+
+/// The camera button next to a date. Long-press reads a photo already in
+/// the library instead.
+class ScanDateButton extends StatefulWidget {
+  const ScanDateButton({super.key, required this.onDate});
+
+  final ValueChanged<DateTime> onDate;
+
+  @override
+  State<ScanDateButton> createState() => _ScanDateButtonState();
+}
+
+class _ScanDateButtonState extends State<ScanDateButton> {
+  bool _busy = false;
+
+  Future<void> _scan({bool fromLibrary = false}) async {
+    setState(() => _busy = true);
+    final d = await scanDate(context, fromLibrary: fromLibrary);
+    if (mounted) setState(() => _busy = false);
+    if (d != null) widget.onDate(d);
+  }
+
+  @override
+  Widget build(BuildContext context) => GestureDetector(
+    onLongPress: _busy ? null : () => _scan(fromLibrary: true),
+    child: IconButton(
+      tooltip: 'Scan date on pack (hold to pick a photo)',
+      onPressed: _busy ? null : _scan,
+      icon: _busy
+          ? const SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          : const Icon(Icons.document_scanner_outlined),
+    ),
+  );
 }
 
 Future<DateTime?> _pickDate(BuildContext context, DateTime? initial) {
@@ -120,6 +192,7 @@ Future<ItemSheetResult?> showInventoryItemSheet(
                     ),
                   ),
                   const Spacer(),
+                  ScanDateButton(onDate: (d) => setState(() => expiresAt = d)),
                   TextButton(
                     onPressed: () async {
                       final d = await _pickDate(context, expiresAt);
@@ -361,6 +434,13 @@ class _PutAwayRow extends StatelessWidget {
               },
             ),
           ],
+        ),
+        trailing: ScanDateButton(
+          onDate: (d) {
+            choice.expiresAt = d;
+            choice.include = true;
+            onChanged();
+          },
         ),
       ),
     );

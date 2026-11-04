@@ -43,6 +43,10 @@
 	<string>Butlu reads and writes your iOS Calendar events so it can keep your family calendar in sync.</string>
 	<key>NSCalendarsFullAccessUsageDescription</key>
 	<string>Butlu reads and writes your iOS Calendar events so it can keep your family calendar in sync.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Butlu reads best-before dates off packaging so you don't have to type them.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Butlu can read a best-before date from a photo you've already taken.</string>
 	<key>NSFaceIDUsageDescription</key>
 	<string>Butlu uses Face ID to keep your Vault notes private.</string>
 	<key>UIApplicationSceneManifest</key>
