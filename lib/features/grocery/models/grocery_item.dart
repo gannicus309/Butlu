@@ -19,8 +19,11 @@ class GroceryItem {
   int daysUntilExpiry() {
     final today = DateTime.now();
     final todayMidnight = DateTime(today.year, today.month, today.day);
-    final expiryMidnight =
-        DateTime(expiryDate.year, expiryDate.month, expiryDate.day);
+    final expiryMidnight = DateTime(
+      expiryDate.year,
+      expiryDate.month,
+      expiryDate.day,
+    );
     return expiryMidnight.difference(todayMidnight).inDays;
   }
 }

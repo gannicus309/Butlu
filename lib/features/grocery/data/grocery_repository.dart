@@ -8,7 +8,7 @@ import '../models/grocery_item.dart';
 /// test in isolation, just CRUD, so a concrete Firestore class is enough.
 class GroceryRepository {
   GroceryRepository({required this.familyId, FirebaseFirestore? firestore})
-      : _firestore = firestore ?? FirebaseFirestore.instance;
+    : _firestore = firestore ?? FirebaseFirestore.instance;
 
   final String familyId;
   final FirebaseFirestore _firestore;
@@ -20,9 +20,10 @@ class GroceryRepository {
 
   Stream<List<GroceryItem>> watchItems() {
     return _items.snapshots().map(
-          (snapshot) => snapshot.docs.map(_fromDoc).toList()
+      (snapshot) =>
+          snapshot.docs.map(_fromDoc).toList()
             ..sort((a, b) => a.expiryDate.compareTo(b.expiryDate)),
-        );
+    );
   }
 
   Future<void> addItem({

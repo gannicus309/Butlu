@@ -64,28 +64,14 @@ service cloud.firestore {
         allow write: if isFamilyMember(familyId) && request.auth.uid == uid;
       }
 
-      match /events/{eventId} {
-        allow read, write: if isFamilyMember(familyId);
-      }
-
-      match /groceryItems/{itemId} {
-        allow read, write: if isFamilyMember(familyId);
-      }
-
-      match /choreTasks/{taskId} {
-        allow read, write: if isFamilyMember(familyId);
-      }
-
-      match /vaultNotes/{noteId} {
-        allow read, write: if isFamilyMember(familyId);
-      }
-
-      match /bills/{billId} {
-        allow read, write: if isFamilyMember(familyId);
-      }
-
-      match /mealPlan/{dayKey} {
-        allow read, write: if isFamilyMember(familyId);
+      // Shared family data (events, shopping list, grocery history,
+      // chores, vault notes, bills, meal plans, and whatever comes next):
+      // any member may read and write any of it. /members and /status are
+      // excluded because they have their own stricter rules below and
+      // above -- you may only write your own entry there.
+      match /{collection}/{docId} {
+        allow read, write: if isFamilyMember(familyId) &&
+          !(collection in ['members', 'status']);
       }
 
       // Same shape as /members/{uid}: everyone in the family can see

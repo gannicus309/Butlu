@@ -37,7 +37,9 @@ class GroceryScreen extends ConsumerWidget {
                   final picked = await showDatePicker(
                     context: context,
                     initialDate: expiryDate,
-                    firstDate: DateTime.now().subtract(const Duration(days: 365)),
+                    firstDate: DateTime.now().subtract(
+                      const Duration(days: 365),
+                    ),
                     lastDate: DateTime.now().add(const Duration(days: 365 * 2)),
                   );
                   if (picked != null) setState(() => expiryDate = picked);
@@ -65,11 +67,9 @@ class GroceryScreen extends ConsumerWidget {
     final uid = ref.read(authStateProvider).value?.uid;
     if (uid == null) return;
 
-    await ref.read(groceryRepositoryProvider).addItem(
-          name: name,
-          expiryDate: expiryDate,
-          addedByUid: uid,
-        );
+    await ref
+        .read(groceryRepositoryProvider)
+        .addItem(name: name, expiryDate: expiryDate, addedByUid: uid);
   }
 
   Color _expiryColor(BuildContext context, int daysLeft) {
@@ -127,7 +127,8 @@ class GroceryScreen extends ConsumerWidget {
           );
         },
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, stackTrace) => Center(child: Text('Something went wrong: $error')),
+        error: (error, stackTrace) =>
+            Center(child: Text('Something went wrong: $error')),
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => _addItem(context, ref),

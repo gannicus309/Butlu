@@ -10,7 +10,7 @@ import '../features/calendar/screens/day_detail_screen.dart';
 import '../features/calendar/screens/month_view_screen.dart';
 import '../features/chores/screens/chores_screen.dart';
 import '../features/gemini/screens/gemini_chat_screen.dart';
-import '../features/grocery/screens/grocery_screen.dart';
+import '../features/grocery/screens/shopping_screen.dart';
 import '../features/meals/screens/meal_plan_screen.dart';
 import '../features/more/screens/more_screen.dart';
 import '../features/pickup/screens/pickup_screen.dart';
@@ -57,7 +57,7 @@ final GoRouter appRouter = GoRouter(
           routes: [
             GoRoute(
               path: '/grocery',
-              builder: (context, state) => const GroceryScreen(),
+              builder: (context, state) => const ShoppingScreen(),
             ),
           ],
         ),
@@ -157,8 +157,8 @@ class _AppShell extends ConsumerWidget {
             label: 'Calendar',
           ),
           NavigationDestination(
-            icon: Icon(Icons.kitchen_outlined),
-            selectedIcon: Icon(Icons.kitchen),
+            icon: Icon(Icons.shopping_cart_outlined),
+            selectedIcon: Icon(Icons.shopping_cart),
             label: 'Grocery',
           ),
           NavigationDestination(
