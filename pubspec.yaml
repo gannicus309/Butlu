@@ -50,6 +50,7 @@ dependencies:
   google_generative_ai: ^0.4.7
   local_auth: ^3.0.2
   shared_preferences: ^2.5.6
+  flutter_local_notifications: ^22.3.3
 dev_dependencies:
   flutter_test:
     sdk: flutter

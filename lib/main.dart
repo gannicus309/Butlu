@@ -1,6 +1,7 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'app/dev_mode.dart';
@@ -9,17 +10,27 @@ import 'app/theme.dart';
 import 'features/auth/providers/auth_providers.dart';
 import 'features/auth/screens/family_setup_screen.dart';
 import 'features/auth/screens/sign_in_screen.dart';
+import 'features/calendar/providers/calendar_providers.dart';
 import 'features/calendar/providers/calendar_selection_provider.dart';
 import 'firebase_options.dart';
+import 'services/clash_notifier.dart';
 import 'shared/widgets/butlu_logo.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   final prefs = await SharedPreferences.getInstance();
+  final clashNotifier = ClashNotifier(prefs);
+  await clashNotifier.init(
+    onOpenDay: (day) =>
+        appRouter.go('/calendar/day/${DateFormat('yyyy-MM-dd').format(day)}'),
+  );
   runApp(
     ProviderScope(
-      overrides: [sharedPreferencesProvider.overrideWithValue(prefs)],
+      overrides: [
+        sharedPreferencesProvider.overrideWithValue(prefs),
+        clashNotifierProvider.overrideWithValue(clashNotifier),
+      ],
       child: const ButluRoot(),
     ),
   );

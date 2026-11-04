@@ -6,9 +6,11 @@ import 'package:uuid/uuid.dart';
 
 import '../../auth/providers/auth_providers.dart' show authStateProvider;
 import '../models/calendar_event.dart';
+import '../models/conflicts.dart';
 import '../models/event_source.dart';
 import '../providers/calendar_providers.dart';
 import '../widgets/day_timeline.dart';
+import '../widgets/event_dot_marker.dart';
 
 /// A day as an hour grid (see [DayTimeline]). Swipe left/right for the next
 /// or previous day; tap a free hour, or the + button, to add an event.
@@ -88,7 +90,78 @@ class _DayDetailScreenState extends ConsumerState<DayDetailScreen> {
       lastModifiedAt: nowUtc,
       lastModifiedBy: EventSource.butlu,
     );
+    final clashes = clashesForNewEvent(
+      ref.read(eventsForDayProvider(day)),
+      event.startAt,
+      event.endAt,
+    );
+    if (clashes.isNotEmpty) {
+      if (!await _confirmClash(clashes)) return;
+      // Already warned and accepted: don't notify about it again.
+      await ref.read(clashNotifierProvider).markSeen([
+        for (final c in clashes) EventConflict(event, c).key,
+      ]);
+    }
     await ref.read(firestoreEventRepositoryProvider).upsert(event);
+  }
+
+  /// Asks before saving an event that overlaps others; true to save anyway.
+  Future<bool> _confirmClash(List<CalendarEvent> clashes) async {
+    HapticFeedback.mediumImpact();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        final theme = Theme.of(context);
+        return AlertDialog(
+          icon: Icon(
+            Icons.warning_amber_rounded,
+            color: theme.colorScheme.error,
+          ),
+          title: const Text('This clashes with'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              for (final e in clashes)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: Row(
+                    children: [
+                      Container(width: 4, height: 32, color: colorForEvent(e)),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(e.title, style: theme.textTheme.titleSmall),
+                            Text(
+                              '${DateFormat.jm().format(e.startAt.toLocal())} – '
+                              '${DateFormat.jm().format(e.endAt.toLocal())}'
+                              ' · ${e.effectiveCategory.label}',
+                              style: theme.textTheme.bodySmall,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Add anyway'),
+            ),
+          ],
+        );
+      },
+    );
+    return ok ?? false;
   }
 
   /// The + button adds at the next full hour on today, else at 9:00.

@@ -6,7 +6,9 @@ import '../data/firestore_event_repository.dart';
 import '../data/firestore_event_repository_impl.dart';
 import '../data/ios_calendar_repository.dart';
 import '../data/ios_calendar_repository_impl.dart';
+import '../../../services/clash_notifier.dart';
 import '../models/calendar_event.dart';
+import '../models/conflicts.dart';
 import '../models/event_dedupe.dart';
 import '../sync/calendar_sync_service.dart';
 import 'calendar_selection_provider.dart';
@@ -39,13 +41,35 @@ final selectedDayProvider = StateProvider<DateTime?>((ref) => null);
 
 /// Events grouped by calendar day (local time, midnight-keyed) -- the shape
 /// `table_calendar`'s `eventLoader` and the day-detail screen both want.
-final eventsByDayProvider = Provider<Map<DateTime, List<CalendarEvent>>>((ref) {
+/// Live events with deleted ones dropped and cross-calendar duplicates
+/// merged -- what every calendar view and the clash check work from.
+final mergedEventsProvider = Provider<List<CalendarEvent>>((ref) {
   final events = ref.watch(eventsProvider).value ?? const [];
-  final map = <DateTime, List<CalendarEvent>>{};
-  for (final event in mergeDuplicates([
+  return mergeDuplicates([
     for (final e in events)
       if (!e.deleted) e,
-  ])) {
+  ]);
+}, dependencies: [eventsProvider]);
+
+/// Clashes in the next 30 days, for notifications.
+final upcomingConflictsProvider = Provider<List<EventConflict>>((ref) {
+  final now = DateTime.now();
+  return findConflicts(
+    ref.watch(mergedEventsProvider),
+    from: now,
+    to: now.add(const Duration(days: 30)),
+  );
+}, dependencies: [mergedEventsProvider]);
+
+/// Overridden in main() with one that's been initialised; this default
+/// (used by tests) is never initialised, so it silently does nothing.
+final clashNotifierProvider = Provider<ClashNotifier>(
+  (ref) => ClashNotifier(ref.watch(sharedPreferencesProvider)),
+);
+
+final eventsByDayProvider = Provider<Map<DateTime, List<CalendarEvent>>>((ref) {
+  final map = <DateTime, List<CalendarEvent>>{};
+  for (final event in ref.watch(mergedEventsProvider)) {
     // Filed under every day it covers, so an event running past midnight or
     // a multi-day all-day event shows on each of its days. The end is
     // exclusive: an all-day event ends at the next midnight.
@@ -68,7 +92,7 @@ final eventsByDayProvider = Provider<Map<DateTime, List<CalendarEvent>>>((ref) {
     list.sort((a, b) => a.startAt.compareTo(b.startAt));
   }
   return map;
-}, dependencies: [eventsProvider]);
+}, dependencies: [mergedEventsProvider]);
 
 final eventsForDayProvider = Provider.family<List<CalendarEvent>, DateTime>(
   (ref, day) => ref.watch(eventsByDayProvider)[_dateOnly(day)] ?? const [],

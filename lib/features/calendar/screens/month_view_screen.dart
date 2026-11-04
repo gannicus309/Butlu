@@ -45,6 +45,7 @@ class _MonthViewScreenState extends ConsumerState<MonthViewScreen>
   Future<void> _firstSync() async {
     final ios = ref.read(iosCalendarRepositoryProvider);
     if (!await ios.hasPermission()) await ios.requestPermission();
+    await ref.read(clashNotifierProvider).requestPermission();
     await _syncNow(quiet: true);
   }
 
@@ -102,6 +103,12 @@ class _MonthViewScreenState extends ConsumerState<MonthViewScreen>
     // listener on the choices fired before that rebuild and synced with the
     // old ones.)
     ref.listen(calendarSyncServiceProvider, (previous, next) => _syncNow());
+    // Lives here because this screen stays mounted for as long as the app
+    // shows the family's calendar, whichever tab is open.
+    ref.listen(
+      upcomingConflictsProvider,
+      (previous, next) => ref.read(clashNotifierProvider).notifyNew(next),
+    );
 
     final scheme = Theme.of(context).colorScheme;
     final focusedMonth = ref.watch(focusedMonthProvider);

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import '../models/calendar_event.dart';
+import '../models/conflicts.dart';
 import '../models/day_layout.dart';
 import 'event_dot_marker.dart';
 
@@ -29,6 +30,8 @@ class DayTimeline extends StatefulWidget {
   @override
   State<DayTimeline> createState() => _DayTimelineState();
 }
+
+const _clashRed = Color(0xFFFF453A);
 
 class _DayTimelineState extends State<DayTimeline> {
   late final ScrollController _scroll = ScrollController(
@@ -80,6 +83,13 @@ class _DayTimelineState extends State<DayTimeline> {
     final theme = Theme.of(context);
     final allDay = widget.events.where((e) => e.isAllDay).toList();
     final slots = layoutDay(widget.events, widget.day);
+    final clashing = {
+      for (final c in findConflicts(
+        widget.events,
+        from: widget.day,
+        to: widget.day.add(const Duration(days: 1)),
+      )) ...[c.a.id, c.b.id],
+    };
 
     return Column(
       children: [
@@ -109,7 +119,8 @@ class _DayTimelineState extends State<DayTimeline> {
                   return Stack(
                     children: [
                       for (var h = 0; h < 24; h++) _hourRow(context, h),
-                      for (final slot in slots) _block(context, slot, width),
+                      for (final slot in slots)
+                        _block(context, slot, width, clashing),
                       if (_isToday) _nowLine(context),
                     ],
                   );
@@ -170,7 +181,12 @@ class _DayTimelineState extends State<DayTimeline> {
     );
   }
 
-  Widget _block(BuildContext context, TimelineSlot slot, double width) {
+  Widget _block(
+    BuildContext context,
+    TimelineSlot slot,
+    double width,
+    Set<String> clashing,
+  ) {
     final theme = Theme.of(context);
     final color = colorForEvent(slot.event);
     final columnWidth = width / slot.columns;
@@ -178,6 +194,7 @@ class _DayTimelineState extends State<DayTimeline> {
     final height =
         (slot.endMinute - slot.startMinute) / 60 * DayTimeline.hourHeight;
     final e = slot.event;
+    final clash = clashing.contains(e.id);
     final time =
         '${DateFormat.jm().format(e.startAt.toLocal())} – '
         '${DateFormat.jm().format(e.endAt.toLocal())}';
@@ -189,6 +206,12 @@ class _DayTimelineState extends State<DayTimeline> {
       width: columnWidth - 2,
       child: Container(
         clipBehavior: Clip.antiAlias,
+        foregroundDecoration: clash
+            ? BoxDecoration(
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: _clashRed, width: 1.5),
+              )
+            : null,
         decoration: BoxDecoration(
           color: Color.alphaBlend(
             color.withValues(alpha: 0.28),
@@ -201,13 +224,29 @@ class _DayTimelineState extends State<DayTimeline> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              e.title,
-              maxLines: height < 40 ? 1 : 2,
-              overflow: TextOverflow.ellipsis,
-              style: theme.textTheme.labelMedium?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (clash)
+                  const Padding(
+                    padding: EdgeInsets.only(right: 3, top: 1),
+                    child: Icon(
+                      Icons.warning_amber_rounded,
+                      size: 14,
+                      color: _clashRed,
+                    ),
+                  ),
+                Expanded(
+                  child: Text(
+                    e.title,
+                    maxLines: height < 40 ? 1 : 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
             ),
             if (height >= 40)
               Text(
