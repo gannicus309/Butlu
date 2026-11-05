@@ -8,6 +8,7 @@ import '../features/bills/screens/bills_screen.dart';
 import '../features/calendar/screens/calendar_sources_screen.dart';
 import '../features/calendar/screens/day_detail_screen.dart';
 import '../features/calendar/screens/month_view_screen.dart';
+import '../features/chores/screens/chore_load_screen.dart';
 import '../features/chores/screens/chores_screen.dart';
 import '../features/gemini/screens/gemini_chat_screen.dart';
 import '../features/grocery/screens/shopping_screen.dart';
@@ -77,6 +78,12 @@ final GoRouter appRouter = GoRouter(
             GoRoute(
               path: '/chores',
               builder: (context, state) => const ChoresScreen(),
+              routes: [
+                GoRoute(
+                  path: 'load',
+                  builder: (context, state) => const ChoreLoadScreen(),
+                ),
+              ],
             ),
           ],
         ),
