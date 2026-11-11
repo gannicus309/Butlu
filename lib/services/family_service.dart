@@ -35,11 +35,27 @@ class FamilyService {
   Future<({String familyId, String name})?> findPendingInvite(
     String email,
   ) async {
-    final invite = await _invites.doc(_norm(email)).get();
-    final data = invite.data();
+    final ref = _invites.doc(_norm(email));
+    final data = (await ref.get()).data();
     if (data == null) return null;
+    final familyId = data['familyId'] as String;
+    // An invite can outlive its family (everyone left, so it was deleted).
+    // The family can't be read then, so drop the invite rather than offer
+    // a Join that can only fail.
+    try {
+      final family = await _families.doc(familyId).get();
+      if (!family.exists) throw StateError('gone');
+    } on Object catch (e) {
+      if (e is FirebaseException && e.code != 'permission-denied') rethrow;
+      try {
+        await ref.delete();
+      } on FirebaseException {
+        // Ignore; it's only tidying up.
+      }
+      return null;
+    }
     return (
-      familyId: data['familyId'] as String,
+      familyId: familyId,
       name: data['familyName'] as String? ?? 'your family',
     );
   }
@@ -51,8 +67,16 @@ class FamilyService {
     final family = await _families.doc(familyId).get();
     final data = family.data();
     if (data == null) return;
+    // Members' own emails get no invite: one pointing at a family they're
+    // already in would only go stale if they later leave.
+    final members = await family.reference.collection('members').get();
+    final memberEmails = {
+      for (final m in members.docs)
+        if (m.data()['email'] is String) _norm(m.data()['email'] as String),
+    };
     final batch = _firestore.batch();
     for (final e in data['invitedEmails'] as List? ?? const []) {
+      if (memberEmails.contains(_norm('$e'))) continue;
       batch.set(_invites.doc(_norm('$e')), {
         'familyId': familyId,
         'familyName': data['name'],
@@ -119,11 +143,19 @@ class FamilyService {
     required String uid,
   }) async {
     final doc = _families.doc(familyId);
-    final members = List<String>.from(
-      (await doc.get()).data()?['memberUids'] as List? ?? const [],
-    );
+    final data = (await doc.get()).data();
+    final members = List<String>.from(data?['memberUids'] as List? ?? const []);
     await doc.collection('members').doc(uid).delete();
     if (members.length <= 1) {
+      // The family is going away: withdraw its invites first (only a
+      // member may), so nobody is left holding a Join that can't work.
+      for (final e in data?['invitedEmails'] as List? ?? const []) {
+        try {
+          await _invites.doc(_norm('$e')).delete();
+        } on FirebaseException {
+          // Not ours (points at another family) or already gone.
+        }
+      }
       await doc.delete();
     } else {
       await doc.update({
@@ -145,6 +177,19 @@ class FamilyService {
         'memberUids': FieldValue.arrayUnion([uid]),
       });
     } on FirebaseException catch (e) {
+      if (e.code == 'permission-denied') {
+        // Most likely an out-of-date invite; clear it so the next sign-in
+        // picks up a fresh one.
+        try {
+          await _invites.doc(_norm(email)).delete();
+        } on FirebaseException {
+          // Ignore.
+        }
+        throw StateError(
+          'This invitation is out of date. Ask the family to open Butlu '
+          '(or invite you again from Account), then sign in again.',
+        );
+      }
       throw StateError('Joining the family failed: ${e.message}');
     }
     try {
