@@ -22,11 +22,22 @@ import UserNotifications
     if let registrar = engineBridge.pluginRegistry.registrar(forPlugin: "ButluSigningInfo") {
       FlutterMethodChannel(name: "butlu/signing", binaryMessenger: registrar.messenger())
         .setMethodCallHandler { call, result in
-          guard call.method == "expiresAt" else {
+          switch call.method {
+          case "expiresAt":
+            result(AppDelegate.signingExpiry())
+          case "appInfo":
+            let info = Bundle.main.infoDictionary ?? [:]
+            result([
+              "version": info["CFBundleShortVersionString"] as? String ?? "?",
+              "build": info["CFBundleVersion"] as? String ?? "?",
+              "bundleId": Bundle.main.bundleIdentifier ?? "?",
+              "expiresAt": AppDelegate.signingExpiry() as Any,
+              "iosVersion": UIDevice.current.systemVersion,
+              "device": UIDevice.current.name,
+            ])
+          default:
             result(FlutterMethodNotImplemented)
-            return
           }
-          result(AppDelegate.signingExpiry())
         }
     }
   }

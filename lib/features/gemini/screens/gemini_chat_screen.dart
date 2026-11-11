@@ -48,12 +48,21 @@ class _GeminiChatScreenState extends ConsumerState<GeminiChatScreen> {
 
     try {
       final history = _messages.sublist(0, _messages.length - 1);
-      final reply = await ref.read(geminiChatServiceProvider).ask(text, history);
-      setState(() => _messages.add(ChatMessage(role: ChatRole.model, text: reply)));
+      final reply = await ref
+          .read(geminiChatServiceProvider)
+          .ask(text, history);
+      setState(
+        () => _messages.add(ChatMessage(role: ChatRole.model, text: reply)),
+      );
     } catch (e) {
-      setState(() => _messages.add(
-            ChatMessage(role: ChatRole.model, text: "Sorry, that didn't work: $e"),
-          ));
+      setState(
+        () => _messages.add(
+          ChatMessage(
+            role: ChatRole.model,
+            text: "Sorry, that didn't work: $e",
+          ),
+        ),
+      );
     } finally {
       if (mounted) setState(() => _sending = false);
       _scrollToBottom();
@@ -79,7 +88,8 @@ class _GeminiChatScreenState extends ConsumerState<GeminiChatScreen> {
                     controller: _scrollController,
                     padding: const EdgeInsets.all(16),
                     itemCount: _messages.length,
-                    itemBuilder: (context, index) => _bubble(context, _messages[index]),
+                    itemBuilder: (context, index) =>
+                        _bubble(context, _messages[index]),
                   ),
           ),
           if (_sending)
@@ -99,7 +109,9 @@ class _GeminiChatScreenState extends ConsumerState<GeminiChatScreen> {
                   Expanded(
                     child: TextField(
                       controller: _inputController,
-                      decoration: const InputDecoration(hintText: 'Message Gemini'),
+                      decoration: const InputDecoration(
+                        hintText: 'Message Gemini',
+                      ),
                       onSubmitted: (_) => _send(),
                     ),
                   ),
@@ -123,7 +135,9 @@ class _GeminiChatScreenState extends ConsumerState<GeminiChatScreen> {
       child: Container(
         margin: const EdgeInsets.symmetric(vertical: 4),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75),
+        constraints: BoxConstraints(
+          maxWidth: MediaQuery.of(context).size.width * 0.75,
+        ),
         decoration: BoxDecoration(
           color: isUser
               ? Theme.of(context).colorScheme.primaryContainer

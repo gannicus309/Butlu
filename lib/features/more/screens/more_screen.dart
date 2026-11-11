@@ -41,6 +41,13 @@ class MoreScreen extends StatelessWidget {
             subtitle: const Text('Private notes, behind Face ID'),
             onTap: () => context.push('/more/vault'),
           ),
+          const Divider(),
+          ListTile(
+            leading: const Icon(Icons.info_outline),
+            title: const Text('About Butlu'),
+            subtitle: const Text('Version, build and connections'),
+            onTap: () => context.push('/more/about'),
+          ),
         ],
       ),
     );

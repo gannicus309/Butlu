@@ -6,7 +6,7 @@ import '../models/member_status.dart';
 /// `/families/{familyId}/status`.
 class StatusRepository {
   StatusRepository({required this.familyId, FirebaseFirestore? firestore})
-      : _firestore = firestore ?? FirebaseFirestore.instance;
+    : _firestore = firestore ?? FirebaseFirestore.instance;
 
   final String familyId;
   final FirebaseFirestore _firestore;
@@ -16,8 +16,8 @@ class StatusRepository {
 
   Stream<List<MemberStatus>> watchStatuses() {
     return _statuses.snapshots().map(
-          (snapshot) => snapshot.docs.map(_fromDoc).toList(),
-        );
+      (snapshot) => snapshot.docs.map(_fromDoc).toList(),
+    );
   }
 
   Future<void> setStatus(String uid, String label) async {

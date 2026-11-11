@@ -18,7 +18,11 @@ String _relativeTime(DateTime time) {
 class PickupScreen extends ConsumerWidget {
   const PickupScreen({super.key});
 
-  Future<void> _setCustomStatus(BuildContext context, WidgetRef ref, String uid) async {
+  Future<void> _setCustomStatus(
+    BuildContext context,
+    WidgetRef ref,
+    String uid,
+  ) async {
     final controller = TextEditingController();
     final label = await showDialog<String>(
       context: context,
@@ -69,15 +73,17 @@ class PickupScreen extends ConsumerWidget {
                   child: Card(
                     child: ListTile(
                       leading: CircleAvatar(
-                        child: Text(entry.value.isNotEmpty
-                            ? entry.value[0].toUpperCase()
-                            : '?'),
+                        child: Text(
+                          entry.value.isNotEmpty
+                              ? entry.value[0].toUpperCase()
+                              : '?',
+                        ),
                       ),
                       title: Text(entry.value),
                       subtitle: Text(
                         statusByUid[entry.key] != null
                             ? '${statusByUid[entry.key]!.label} · '
-                                '${_relativeTime(statusByUid[entry.key]!.updatedAt)}'
+                                  '${_relativeTime(statusByUid[entry.key]!.updatedAt)}'
                             : 'No status set',
                       ),
                     ),
@@ -100,8 +106,8 @@ class PickupScreen extends ConsumerWidget {
                         onPressed: currentUid == null
                             ? null
                             : () => ref
-                                .read(statusRepositoryProvider)
-                                .setStatus(currentUid, preset),
+                                  .read(statusRepositoryProvider)
+                                  .setStatus(currentUid, preset),
                       ),
                     ),
                   PressableScale(
@@ -119,7 +125,8 @@ class PickupScreen extends ConsumerWidget {
           );
         },
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, stackTrace) => Center(child: Text('Something went wrong: $error')),
+        error: (error, stackTrace) =>
+            Center(child: Text('Something went wrong: $error')),
       ),
     );
   }

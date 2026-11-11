@@ -13,17 +13,19 @@ class AccountAvatarButton extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(authStateProvider).value;
-    final initial = (user?.displayName?.isNotEmpty == true
-            ? user!.displayName![0]
-            : user?.email?[0] ?? '?')
-        .toUpperCase();
+    final initial =
+        (user?.displayName?.isNotEmpty == true
+                ? user!.displayName![0]
+                : user?.email?[0] ?? '?')
+            .toUpperCase();
 
     return IconButton(
       onPressed: () => context.push('/account'),
       icon: CircleAvatar(
         radius: 16,
-        backgroundImage:
-            user?.photoURL != null ? NetworkImage(user!.photoURL!) : null,
+        backgroundImage: user?.photoURL != null
+            ? NetworkImage(user!.photoURL!)
+            : null,
         child: user?.photoURL == null
             ? Text(initial, style: const TextStyle(fontSize: 14))
             : null,

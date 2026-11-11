@@ -40,7 +40,9 @@ class MealPlanScreen extends ConsumerWidget {
       ),
     );
     if (text == null) return;
-    await ref.read(mealPlanRepositoryProvider).setMeal(dateKey, mealType, text.trim());
+    await ref
+        .read(mealPlanRepositoryProvider)
+        .setMeal(dateKey, mealType, text.trim());
   }
 
   @override
@@ -82,23 +84,32 @@ class MealPlanScreen extends ConsumerWidget {
                     : DateFormat('EEEE, MMM d').format(day),
                 style: Theme.of(context).textTheme.titleSmall,
               ),
-              Builder(builder: (context) {
-                final dateKey = MealPlanRepository.keyFor(day);
-                final mealDay = plan[dateKey] ?? MealPlanDay(date: dateKey);
-                return Column(
-                  children: [
-                    _mealRow(context, ref, dateKey, 'breakfast', mealDay.breakfast),
-                    _mealRow(context, ref, dateKey, 'lunch', mealDay.lunch),
-                    _mealRow(context, ref, dateKey, 'dinner', mealDay.dinner),
-                  ],
-                );
-              }),
+              Builder(
+                builder: (context) {
+                  final dateKey = MealPlanRepository.keyFor(day);
+                  final mealDay = plan[dateKey] ?? MealPlanDay(date: dateKey);
+                  return Column(
+                    children: [
+                      _mealRow(
+                        context,
+                        ref,
+                        dateKey,
+                        'breakfast',
+                        mealDay.breakfast,
+                      ),
+                      _mealRow(context, ref, dateKey, 'lunch', mealDay.lunch),
+                      _mealRow(context, ref, dateKey, 'dinner', mealDay.dinner),
+                    ],
+                  );
+                },
+              ),
               const SizedBox(height: 12),
             ],
           ],
         ),
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, stackTrace) => Center(child: Text('Something went wrong: $error')),
+        error: (error, stackTrace) =>
+            Center(child: Text('Something went wrong: $error')),
       ),
     );
   }

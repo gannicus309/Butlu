@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 
+import '../../../services/pack_scanner.dart';
 import '../../../shared/widgets/account_avatar_button.dart';
 import '../../../shared/widgets/empty_state.dart';
 import '../../auth/providers/auth_providers.dart' show authStateProvider;
@@ -61,6 +63,134 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
     ], uid: uid);
     await repo.markPutAway(choices.map((c) => c.entry.item.id));
     HapticFeedback.mediumImpact();
+  }
+
+  /// The + button: photo of the pack (the usual way) or typing it in.
+  Future<void> _add() async {
+    final choice = await showModalBottomSheet<String>(
+      context: context,
+      useRootNavigator: true,
+      showDragHandle: true,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.photo_camera_outlined),
+              title: const Text('Take a photo'),
+              subtitle: const Text('Reads what it is and its date'),
+              onTap: () => Navigator.pop(context, 'camera'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library_outlined),
+              title: const Text('Choose a photo'),
+              onTap: () => Navigator.pop(context, 'library'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.keyboard_outlined),
+              title: const Text('Type it in'),
+              onTap: () => Navigator.pop(context, 'manual'),
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+    switch (choice) {
+      case 'camera':
+        await _scan(fromLibrary: false);
+      case 'library':
+        await _scan(fromLibrary: true);
+      case 'manual':
+        await _addManually();
+    }
+  }
+
+  void _say(String text, {SnackBarAction? action}) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          persist: false,
+          duration: const Duration(seconds: 6),
+          content: Text(text),
+          action: action,
+        ),
+      );
+  }
+
+  /// Photo → item, added straight away; the snackbar offers to fix it.
+  Future<void> _scan({required bool fromLibrary}) async {
+    var reading = false;
+    final result = await scanPack(
+      fromLibrary: fromLibrary,
+      onPhotoTaken: () {
+        if (!mounted) return;
+        reading = true;
+        showDialog<void>(
+          context: context,
+          useRootNavigator: true,
+          barrierDismissible: false,
+          builder: (_) => const AlertDialog(
+            content: Row(
+              children: [
+                CircularProgressIndicator(),
+                SizedBox(width: 20),
+                Expanded(child: Text('Reading the pack…')),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+    if (!mounted) return;
+    if (reading) Navigator.of(context, rootNavigator: true).pop();
+    final uid = _uid;
+    switch (result) {
+      case null:
+        return;
+      case PackFailed(:final message):
+        _say(message);
+      case PackUnknown(:final seen):
+        _say(
+          seen.isEmpty
+              ? "Couldn't make it out. Try closer, with more light."
+              : "Couldn't tell what this is. Read: ${seen.take(4).join(' · ')}",
+          action: SnackBarAction(label: 'Type it', onPressed: _addManually),
+        );
+      case PackFound(:final scan):
+        if (uid == null) return;
+        final id = await ref
+            .read(inventoryRepositoryProvider)
+            .add(scan.item, uid: uid);
+        HapticFeedback.mediumImpact();
+        if (!mounted) return;
+        final item = scan.item;
+        final date = item.expiresAt == null
+            ? ''
+            : scan.dateRead
+            ? ' · until ${DateFormat.MMMEd().format(item.expiresAt!)}'
+            : ' · no date found, guessed '
+                  '${DateFormat.MMMEd().format(item.expiresAt!)}';
+        _say(
+          '${item.emoji}  ${item.name} → ${item.storage.label}$date',
+          action: SnackBarAction(
+            label: 'Change',
+            onPressed: () => _open(
+              InventoryItem(
+                id: id,
+                name: item.name,
+                emoji: item.emoji,
+                category: item.category,
+                storage: item.storage,
+                catalogId: item.catalogId,
+                spec: item.spec,
+                expiresAt: item.expiresAt,
+              ),
+            ),
+          ),
+        );
+    }
   }
 
   Future<void> _addManually() async {
@@ -176,7 +306,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
       ),
       floatingActionButton: FloatingActionButton(
         heroTag: 'inventory-add',
-        onPressed: _addManually,
+        onPressed: _add,
         child: const Icon(Icons.add),
       ),
       body: CustomScrollView(

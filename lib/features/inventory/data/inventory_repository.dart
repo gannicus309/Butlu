@@ -30,6 +30,13 @@ class InventoryRepository {
     await batch.commit();
   }
 
+  /// Adds one item and returns its id.
+  Future<String> add(InventoryItem item, {required String uid}) async {
+    final doc = _items.doc();
+    await doc.set({..._fields(item), 'addedByUid': uid});
+    return doc.id;
+  }
+
   Future<void> update(InventoryItem item) =>
       _items.doc(item.id).update(_fields(item)..remove('addedAt'));
 

@@ -23,7 +23,7 @@ class MealPlanDay {
 /// week window is a plain document-id range query -- no date field needed.
 class MealPlanRepository {
   MealPlanRepository({required this.familyId, FirebaseFirestore? firestore})
-      : _firestore = firestore ?? FirebaseFirestore.instance;
+    : _firestore = firestore ?? FirebaseFirestore.instance;
 
   final String familyId;
   final FirebaseFirestore _firestore;

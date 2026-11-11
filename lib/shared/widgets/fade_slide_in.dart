@@ -4,7 +4,11 @@ import 'package:flutter/material.dart';
 /// per list index (see [FadeSlideIn.staggerDelay]) for a staggered-entrance
 /// list rather than everything popping in at once.
 class FadeSlideIn extends StatefulWidget {
-  const FadeSlideIn({super.key, required this.child, this.delay = Duration.zero});
+  const FadeSlideIn({
+    super.key,
+    required this.child,
+    this.delay = Duration.zero,
+  });
 
   final Widget child;
   final Duration delay;
@@ -18,7 +22,8 @@ class FadeSlideIn extends StatefulWidget {
   State<FadeSlideIn> createState() => _FadeSlideInState();
 }
 
-class _FadeSlideInState extends State<FadeSlideIn> with SingleTickerProviderStateMixin {
+class _FadeSlideInState extends State<FadeSlideIn>
+    with SingleTickerProviderStateMixin {
   late final AnimationController _controller = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 300),

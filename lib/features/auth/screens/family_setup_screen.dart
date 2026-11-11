@@ -49,23 +49,32 @@ class _FamilySetupScreenState extends ConsumerState<FamilySetupScreen> {
       setState(() => _error = "Enter your spouse's email first.");
       return;
     }
-    await _run(() => ref.read(familyServiceProvider).createFamily(
-          creatorUid: user.uid,
-          creatorDisplayName: user.displayName ?? user.email!.split('@').first,
-          creatorEmail: user.email!,
-          spouseEmail: spouseEmail,
-        ));
+    await _run(
+      () => ref
+          .read(familyServiceProvider)
+          .createFamily(
+            creatorUid: user.uid,
+            creatorDisplayName:
+                user.displayName ?? user.email!.split('@').first,
+            creatorEmail: user.email!,
+            spouseEmail: spouseEmail,
+          ),
+    );
   }
 
   Future<void> _joinFamily(String familyId) async {
     final user = ref.read(authStateProvider).value;
     if (user == null || user.email == null) return;
-    await _run(() => ref.read(familyServiceProvider).joinFamily(
-          familyId: familyId,
-          uid: user.uid,
-          displayName: user.displayName ?? user.email!.split('@').first,
-          email: user.email!,
-        ));
+    await _run(
+      () => ref
+          .read(familyServiceProvider)
+          .joinFamily(
+            familyId: familyId,
+            uid: user.uid,
+            displayName: user.displayName ?? user.email!.split('@').first,
+            email: user.email!,
+          ),
+    );
   }
 
   @override
@@ -101,7 +110,9 @@ class _FamilySetupScreenState extends ConsumerState<FamilySetupScreen> {
                 const SizedBox(height: 16),
                 TextField(
                   controller: _spouseEmailController,
-                  decoration: const InputDecoration(labelText: "Spouse's email"),
+                  decoration: const InputDecoration(
+                    labelText: "Spouse's email",
+                  ),
                   keyboardType: TextInputType.emailAddress,
                 ),
                 const SizedBox(height: 16),

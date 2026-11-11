@@ -42,8 +42,13 @@ final class TextRecognizer: NSObject, FlutterPlugin {
         }
         return
       }
-      let lines = (request.results as? [VNRecognizedTextObservation] ?? [])
-        .compactMap { $0.topCandidates(1).first?.string }
+      // Best reading of each line in order (date keywords and the date
+      // usually sit on neighbouring lines), then the runner-up readings:
+      // inkjet dates on cartons are often misread on the first guess.
+      let observations = request.results as? [VNRecognizedTextObservation] ?? []
+      let best = observations.compactMap { $0.topCandidates(1).first?.string }
+      let alternates = observations.flatMap { $0.topCandidates(3).dropFirst().map(\.string) }
+      let lines = best + alternates.filter { !best.contains($0) }
       DispatchQueue.main.async { result(lines) }
     }
     request.recognitionLevel = .accurate

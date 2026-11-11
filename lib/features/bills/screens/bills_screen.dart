@@ -33,8 +33,12 @@ class BillsScreen extends ConsumerWidget {
               const SizedBox(height: 12),
               TextField(
                 controller: amountController,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                decoration: const InputDecoration(labelText: 'Amount (optional)'),
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                decoration: const InputDecoration(
+                  labelText: 'Amount (optional)',
+                ),
               ),
               const SizedBox(height: 16),
               OutlinedButton.icon(
@@ -44,7 +48,9 @@ class BillsScreen extends ConsumerWidget {
                   final picked = await showDatePicker(
                     context: context,
                     initialDate: dueDate,
-                    firstDate: DateTime.now().subtract(const Duration(days: 365)),
+                    firstDate: DateTime.now().subtract(
+                      const Duration(days: 365),
+                    ),
                     lastDate: DateTime.now().add(const Duration(days: 365 * 2)),
                   );
                   if (picked != null) setState(() => dueDate = picked);
@@ -78,7 +84,9 @@ class BillsScreen extends ConsumerWidget {
     final uid = ref.read(authStateProvider).value?.uid;
     if (uid == null) return;
 
-    await ref.read(billRepositoryProvider).addBill(
+    await ref
+        .read(billRepositoryProvider)
+        .addBill(
           name: name,
           amount: double.tryParse(amountController.text.trim()),
           dueDate: dueDate,
@@ -140,8 +148,9 @@ class BillsScreen extends ConsumerWidget {
                         ),
                       IconButton(
                         icon: const Icon(Icons.delete_outline),
-                        onPressed: () =>
-                            ref.read(billRepositoryProvider).deleteBill(bill.id),
+                        onPressed: () => ref
+                            .read(billRepositoryProvider)
+                            .deleteBill(bill.id),
                       ),
                     ],
                   ),
@@ -151,7 +160,8 @@ class BillsScreen extends ConsumerWidget {
           );
         },
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, stackTrace) => Center(child: Text('Something went wrong: $error')),
+        error: (error, stackTrace) =>
+            Center(child: Text('Something went wrong: $error')),
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => _addBill(context, ref),

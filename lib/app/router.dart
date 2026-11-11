@@ -15,6 +15,7 @@ import '../features/grocery/screens/shopping_screen.dart';
 import '../features/inventory/providers/inventory_providers.dart';
 import '../features/inventory/screens/inventory_screen.dart';
 import '../features/meals/screens/meal_plan_screen.dart';
+import '../features/more/screens/about_screen.dart';
 import '../features/more/screens/more_screen.dart';
 import '../features/pickup/screens/pickup_screen.dart';
 import '../features/vault/screens/note_edit_screen.dart';
@@ -93,6 +94,10 @@ final GoRouter appRouter = GoRouter(
               path: '/more',
               builder: (context, state) => const MoreScreen(),
               routes: [
+                GoRoute(
+                  path: 'about',
+                  builder: (context, state) => const AboutScreen(),
+                ),
                 GoRoute(
                   path: 'bills',
                   builder: (context, state) => const BillsScreen(),

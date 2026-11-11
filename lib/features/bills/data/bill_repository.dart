@@ -5,7 +5,7 @@ import '../models/bill.dart';
 /// Shared-family bills/subscriptions, backed by `/families/{familyId}/bills`.
 class BillRepository {
   BillRepository({required this.familyId, FirebaseFirestore? firestore})
-      : _firestore = firestore ?? FirebaseFirestore.instance;
+    : _firestore = firestore ?? FirebaseFirestore.instance;
 
   final String familyId;
   final FirebaseFirestore _firestore;
@@ -15,9 +15,10 @@ class BillRepository {
 
   Stream<List<Bill>> watchBills() {
     return _bills.snapshots().map(
-          (snapshot) => snapshot.docs.map(_fromDoc).toList()
+      (snapshot) =>
+          snapshot.docs.map(_fromDoc).toList()
             ..sort((a, b) => a.dueDate.compareTo(b.dueDate)),
-        );
+    );
   }
 
   Future<void> addBill({

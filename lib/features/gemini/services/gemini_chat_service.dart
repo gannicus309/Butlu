@@ -14,7 +14,7 @@ import '../models/chat_message.dart';
 /// calling the API directly instead of through a paid backend proxy.
 class GeminiChatService {
   GeminiChatService({String? apiKey})
-      : _apiKey = apiKey ?? const String.fromEnvironment('GEMINI_API_KEY');
+    : _apiKey = apiKey ?? const String.fromEnvironment('GEMINI_API_KEY');
 
   final String _apiKey;
   static const _modelName = 'gemini-3.6-flash';

@@ -94,9 +94,15 @@ if (( FORCE || app_left < MIN_SECONDS )); then
       rm -f "$p"
     fi
   done
-  log "Building"
+  version="$(sed -n 's/^version: *//p' "$REPO/pubspec.yaml")"
+  log "Building Butlu ${version%+*} (${version#*+})"
   cd "$REPO" || exit 1
+  # Which code this is, for More → About ("+changes": not yet committed).
+  commit="$(git rev-parse --short HEAD 2>/dev/null || print unknown)"
+  [[ -n "$(git status --porcelain 2>/dev/null)" ]] && commit+="+changes"
   if ! flutter build ios --release --config-only --dart-define-from-file=dart_define.json \
+      --dart-define=BUTLU_COMMIT="$commit" \
+      --dart-define=BUTLU_BUILT_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
       || ! (cd ios && xcodebuild -workspace Runner.xcworkspace -scheme Runner \
           -configuration Release -destination 'generic/platform=iOS' \
           -allowProvisioningUpdates -allowProvisioningDeviceRegistration \
@@ -117,6 +123,8 @@ for entry in "${todo[@]}"; do
     log "Installed on $name, good until $until_text"
     ok+=("$name")
   else
+    # Forget its date so the next run tries this phone again.
+    rm -f "$STATE/expires-$udid"
     log "Couldn't reach $name; will retry"
     failed+=("$name")
   fi

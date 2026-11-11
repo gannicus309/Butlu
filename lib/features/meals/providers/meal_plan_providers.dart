@@ -8,12 +8,9 @@ final mealPlanRepositoryProvider = Provider<MealPlanRepository>(
   dependencies: [familyIdProvider],
 );
 
-final weekMealPlanProvider = StreamProvider<Map<String, MealPlanDay>>(
-  (ref) {
-    final now = DateTime.now();
-    final start = DateTime(now.year, now.month, now.day);
-    final end = start.add(const Duration(days: 6));
-    return ref.watch(mealPlanRepositoryProvider).watchWeek(start, end);
-  },
-  dependencies: [mealPlanRepositoryProvider],
-);
+final weekMealPlanProvider = StreamProvider<Map<String, MealPlanDay>>((ref) {
+  final now = DateTime.now();
+  final start = DateTime(now.year, now.month, now.day);
+  final end = start.add(const Duration(days: 6));
+  return ref.watch(mealPlanRepositoryProvider).watchWeek(start, end);
+}, dependencies: [mealPlanRepositoryProvider]);

@@ -27,48 +27,66 @@ class ScanFailed extends ScanResult {
 
 const _channel = MethodChannel('butlu/text_recognition');
 
-/// Photographs a pack and reads its best-before date, entirely on the
-/// phone (Apple Vision, see ios/Runner/TextRecognizer.swift). Returns null
-/// if the user backed out of the camera.
-///
-/// With [fromLibrary], or where there's no camera (the simulator), it reads
-/// a photo from the library instead.
-Future<ScanResult?> scanExpiryDate({bool fromLibrary = false}) async {
+/// Why a photo couldn't be taken or read; [message] is for the user.
+class ScanException implements Exception {
+  ScanException(this.message);
+  final String message;
+}
+
+/// Takes a photo of a pack with the camera, or picks one from the library
+/// with [fromLibrary] or where there's no camera (the simulator). Null if
+/// the user backed out.
+Future<XFile?> takePackPhoto({
+  bool fromLibrary = false,
+  double maxSide = 2000,
+}) async {
   if (kIsWeb || defaultTargetPlatform != TargetPlatform.iOS) {
-    return ScanFailed('Date scanning needs an iPhone.');
+    throw ScanException('Scanning needs an iPhone.');
   }
-  final picker = ImagePicker();
   final hasCamera =
       await _channel.invokeMethod<bool>('hasCamera').catchError((_) => false) ??
       false;
-  final source = !fromLibrary && hasCamera
-      ? ImageSource.camera
-      : ImageSource.gallery;
-  final XFile? photo;
   try {
-    photo = await picker.pickImage(
-      source: source,
+    return await ImagePicker().pickImage(
+      source: !fromLibrary && hasCamera
+          ? ImageSource.camera
+          : ImageSource.gallery,
       // Plenty for printed text, and keeps recognition quick.
-      maxWidth: 2000,
-      maxHeight: 2000,
+      maxWidth: maxSide,
+      maxHeight: maxSide,
       imageQuality: 90,
     );
   } on PlatformException catch (e) {
-    return ScanFailed(
+    throw ScanException(
       e.code == 'camera_access_denied'
-          ? 'Allow camera access for Butlu in iOS Settings to scan dates.'
+          ? 'Allow camera access for Butlu in iOS Settings to scan packs.'
           : "Couldn't open the camera: ${e.message ?? e.code}",
     );
   }
-  if (photo == null) return null;
+}
 
+/// The text Apple Vision reads in a photo, on the phone: each line's best
+/// reading in order, then other readings of lines it wasn't sure about.
+Future<List<String>> recognizeText(String path) async {
   try {
-    final lines =
-        await _channel.invokeListMethod<String>('recognizeText', photo.path) ??
+    return await _channel.invokeListMethod<String>('recognizeText', path) ??
         const <String>[];
+  } on PlatformException catch (e) {
+    throw ScanException("Couldn't read the photo: ${e.message ?? e.code}");
+  }
+}
+
+/// Photographs a pack and reads its best-before date, entirely on the
+/// phone (Apple Vision, see ios/Runner/TextRecognizer.swift). Returns null
+/// if the user backed out of the camera.
+Future<ScanResult?> scanExpiryDate({bool fromLibrary = false}) async {
+  try {
+    final photo = await takePackPhoto(fromLibrary: fromLibrary);
+    if (photo == null) return null;
+    final lines = await recognizeText(photo.path);
     final date = parseExpiryDate(lines);
     return date != null ? ScanFound(date) : ScanNoDate(lines);
-  } on PlatformException catch (e) {
-    return ScanFailed("Couldn't read the photo: ${e.message ?? e.code}");
+  } on ScanException catch (e) {
+    return ScanFailed(e.message);
   }
 }
