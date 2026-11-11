@@ -131,6 +131,48 @@ class _FamilySection extends ConsumerWidget {
     }
   }
 
+  Future<void> _leave(
+    BuildContext context,
+    WidgetRef ref, {
+    required bool alone,
+  }) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Leave this family?'),
+        content: Text(
+          alone
+              ? "You're its only member, so the family and everything in it "
+                    '(calendar, lists, chores, vault) is deleted. If you were '
+                    'invited to another family, you can join it next.'
+              : "You'll stop seeing this family's calendar, lists and vault. "
+                    'If you were invited to another family, you can join it '
+                    'next.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.error,
+            ),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Leave'),
+          ),
+        ],
+      ),
+    );
+    final uid = ref.read(authStateProvider).value?.uid;
+    if (ok != true || uid == null) return;
+    await ref
+        .read(familyServiceProvider)
+        .leaveFamily(familyId: ref.read(familyIdProvider), uid: uid);
+    // Back to the family choice: the invite (if any) shows as Join family.
+    ref.invalidate(familyStatusProvider);
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
@@ -172,6 +214,19 @@ class _FamilySection extends ConsumerWidget {
           leading: const Icon(Icons.person_add_alt),
           title: const Text('Invite by email'),
           onTap: () => _invite(context, ref),
+        ),
+        ListTile(
+          leading: Icon(Icons.logout, color: theme.colorScheme.error),
+          title: Text(
+            'Leave this family',
+            style: TextStyle(color: theme.colorScheme.error),
+          ),
+          subtitle: Text(
+            members.length <= 1
+                ? "You're the only member, so this family is deleted"
+                : 'To join a different family you were invited to',
+          ),
+          onTap: () => _leave(context, ref, alone: members.length <= 1),
         ),
       ],
     );

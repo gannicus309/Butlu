@@ -112,6 +112,26 @@ class FamilyService {
     await syncInvites(familyId);
   }
 
+  /// Takes [uid] out of the family, e.g. to switch to another one. The last
+  /// member leaving deletes the family.
+  Future<void> leaveFamily({
+    required String familyId,
+    required String uid,
+  }) async {
+    final doc = _families.doc(familyId);
+    final members = List<String>.from(
+      (await doc.get()).data()?['memberUids'] as List? ?? const [],
+    );
+    await doc.collection('members').doc(uid).delete();
+    if (members.length <= 1) {
+      await doc.delete();
+    } else {
+      await doc.update({
+        'memberUids': FieldValue.arrayRemove([uid]),
+      });
+    }
+  }
+
   Future<void> joinFamily({
     required String familyId,
     required String uid,
