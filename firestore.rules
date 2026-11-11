@@ -27,10 +27,37 @@ service cloud.firestore {
         request.auth.uid in get(/databases/$(database)/documents/families/$(familyId)).data.memberUids;
     }
 
+    // The signed-in account's email, lower-cased -- invite records are keyed
+    // by it.
+    function myEmail() {
+      return request.auth.token.email.lower();
+    }
+
+    // Whether there's an invite record for this account into [familyId].
+    function invitedTo(familyId) {
+      return request.auth != null &&
+        request.auth.token.email != null &&
+        exists(/databases/$(database)/documents/invites/$(myEmail())) &&
+        get(/databases/$(database)/documents/invites/$(myEmail())).data.familyId == familyId;
+    }
+
+    // One invite per email, readable only by that email's account. The app
+    // reads it directly to find the family it was invited to; searching all
+    // families for one listing the email is refused for non-members.
+    match /invites/{email} {
+      allow get: if request.auth != null && request.auth.token.email != null &&
+        myEmail() == email;
+      allow create, update: if isFamilyMember(request.resource.data.familyId);
+      allow delete: if request.auth != null &&
+        ((request.auth.token.email != null && myEmail() == email) ||
+         isFamilyMember(resource.data.familyId));
+    }
+
     match /families/{familyId} {
       allow read: if request.auth != null &&
         (request.auth.uid in resource.data.memberUids ||
-         request.auth.token.email in resource.data.invitedEmails);
+         request.auth.token.email in resource.data.invitedEmails ||
+         invitedTo(familyId));
 
       // Anonymous accounts (the app's dev-mode sign-in, kDevSignIn) have no
       // email, so they may create a family of one with no invites -- which
@@ -50,7 +77,8 @@ service cloud.firestore {
         (
           request.auth.uid in resource.data.memberUids ||
           (
-            request.auth.token.email in resource.data.invitedEmails &&
+            (request.auth.token.email in resource.data.invitedEmails ||
+             invitedTo(familyId)) &&
             !(request.auth.uid in resource.data.memberUids) &&
             request.resource.data.memberUids == resource.data.memberUids + [request.auth.uid] &&
             request.resource.data.diff(resource.data).affectedKeys().hasOnly(['memberUids'])

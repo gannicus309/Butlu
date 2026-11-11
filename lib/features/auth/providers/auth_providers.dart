@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -46,8 +48,17 @@ final familyStatusProvider = FutureProvider<FamilyStatus>((ref) async {
   if (user == null) return const FamilyStatusNone();
 
   final familyService = ref.watch(familyServiceProvider);
-  final existingId = await familyService.findFamilyIdForMember(user.uid);
-  if (existingId != null) return FamilyStatusMember(existingId);
+  final String? existingId;
+  try {
+    existingId = await familyService.findFamilyIdForMember(user.uid);
+  } on FirebaseException catch (e) {
+    throw StateError('Looking up your family failed: ${e.message}');
+  }
+  if (existingId != null) {
+    // Gives older invites their invite records, so they can be found.
+    unawaited(familyService.syncInvites(existingId).catchError((_) {}));
+    return FamilyStatusMember(existingId);
+  }
 
   if (kDevSignIn && user.isAnonymous) {
     return FamilyStatusMember(await familyService.createDevFamily(user.uid));
@@ -55,7 +66,12 @@ final familyStatusProvider = FutureProvider<FamilyStatus>((ref) async {
 
   final email = user.email;
   if (email != null) {
-    final pending = await familyService.findPendingInvite(email);
+    final ({String familyId, String name})? pending;
+    try {
+      pending = await familyService.findPendingInvite(email);
+    } on FirebaseException catch (e) {
+      throw StateError('Looking up your invite failed: ${e.message}');
+    }
     if (pending != null) {
       return FamilyStatusPendingInvite(pending.familyId, pending.name);
     }
