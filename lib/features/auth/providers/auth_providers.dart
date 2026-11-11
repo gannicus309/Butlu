@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -71,3 +72,13 @@ final familyIdProvider = Provider<String>((ref) {
     'familyIdProvider must be overridden once a family is resolved.',
   );
 });
+
+/// The current family's name, members' uids and invited emails, live.
+final familyDocProvider = StreamProvider<Map<String, dynamic>>((ref) {
+  final familyId = ref.watch(familyIdProvider);
+  return FirebaseFirestore.instance
+      .collection('families')
+      .doc(familyId)
+      .snapshots()
+      .map((s) => s.data() ?? const {});
+}, dependencies: [familyIdProvider]);

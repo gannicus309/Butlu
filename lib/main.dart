@@ -57,6 +57,13 @@ class ButluRoot extends ConsumerWidget {
     final authState = ref.watch(authStateProvider);
     return authState.when(
       data: (user) {
+        // A leftover anonymous dev account once dev sign-in is switched off:
+        // sign it out so the real Google sign-in shows, instead of quietly
+        // carrying on in the Dev family.
+        if (user != null && user.isAnonymous && !kDevSignIn) {
+          ref.read(authServiceProvider).signOut();
+          return _wrapPlain(const _LoadingScreen());
+        }
         if (user != null) return const _FamilyGate();
         if (!kDevSignIn) return _wrapPlain(const SignInScreen());
         // Dev builds skip Google: sign in anonymously, and authStateProvider

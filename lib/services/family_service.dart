@@ -76,6 +76,13 @@ class FamilyService {
     return doc.id;
   }
 
+  /// Lets someone else join an existing family: they see it the next time
+  /// they sign in with this Google account.
+  Future<void> invite(String familyId, String email) =>
+      _families.doc(familyId).update({
+        'invitedEmails': FieldValue.arrayUnion([email.trim().toLowerCase()]),
+      });
+
   Future<void> joinFamily({
     required String familyId,
     required String uid,
