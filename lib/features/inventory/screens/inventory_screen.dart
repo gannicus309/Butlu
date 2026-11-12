@@ -173,7 +173,8 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
             : ' · no date found, guessed '
                   '${DateFormat.MMMEd().format(item.expiresAt!)}';
         _say(
-          '${item.emoji}  ${item.name} → ${item.storage.label}$date',
+          '${item.emoji}  ${item.name} → ${item.storage.label}$date'
+          '${scan.byBarcode && item.spec.isNotEmpty ? '\n${item.spec}' : ''}',
           action: SnackBarAction(
             label: 'Change',
             onPressed: () => _open(

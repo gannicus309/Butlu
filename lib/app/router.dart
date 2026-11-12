@@ -10,6 +10,7 @@ import '../features/calendar/screens/day_detail_screen.dart';
 import '../features/calendar/screens/month_view_screen.dart';
 import '../features/chores/screens/chore_load_screen.dart';
 import '../features/chores/screens/chores_screen.dart';
+import '../features/family_notes/screens/family_notes_screen.dart';
 import '../features/gemini/screens/gemini_chat_screen.dart';
 import '../features/grocery/screens/shopping_screen.dart';
 import '../features/inventory/providers/inventory_providers.dart';
@@ -109,6 +110,10 @@ final GoRouter appRouter = GoRouter(
                 GoRoute(
                   path: 'meals',
                   builder: (context, state) => const MealPlanScreen(),
+                ),
+                GoRoute(
+                  path: 'notes',
+                  builder: (context, state) => const FamilyNotesScreen(),
                 ),
                 GoRoute(
                   path: 'gemini',

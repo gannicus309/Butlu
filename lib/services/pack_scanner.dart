@@ -8,6 +8,7 @@ import '../features/grocery/models/catalog.dart';
 import '../features/inventory/models/expiry_parser.dart';
 import '../features/inventory/models/inventory_item.dart';
 import 'expiry_scanner.dart';
+import 'food_facts.dart';
 
 /// What one photo of a pack says: the product, and its date if one could
 /// be read.
@@ -16,6 +17,7 @@ class PackScan {
     required this.item,
     required this.dateRead,
     required this.byGemini,
+    this.byBarcode = false,
   });
 
   /// Ready to add: name, emoji, place and date filled in. When no date
@@ -28,6 +30,18 @@ class PackScan {
   /// Read by Gemini, or by the phone alone (no key, offline, or Gemini
   /// failed).
   final bool byGemini;
+
+  /// Identified from its barcode via Open Food Facts.
+  final bool byBarcode;
+}
+
+/// The first barcode in the photo that Open Food Facts knows.
+Future<FoodFacts?> _factsFromBarcode(String path) async {
+  for (final code in await detectBarcodes(path)) {
+    final facts = await lookUpBarcode(code);
+    if (facts != null) return facts;
+  }
+  return null;
 }
 
 sealed class PackScanResult {}
@@ -56,7 +70,8 @@ const _model = 'gemini-3.6-flash';
 /// Takes a photo of a product and works out what it is and when it goes
 /// off, so it can go straight into the inventory.
 ///
-/// With a Gemini key the photo is sent to Gemini, which reads the label
+/// A product barcode in the photo is looked up in Open Food Facts for the
+/// exact product, brand and size. With a Gemini key the photo is sent to Gemini, which reads the label
 /// and the printed date far better than text recognition alone -- it
 /// knows "Frische Vollmilch 3,5%" is milk and which date is the
 /// best-before. At the same time Apple Vision reads the text on the phone;
@@ -74,50 +89,53 @@ Future<PackScanResult?> scanPack({
     if (photo == null) return null;
     onPhotoTaken?.call();
 
+    // All three at once: text and barcodes on the phone, Gemini online.
     final ocr = recognizeText(photo.path).catchError((_) => <String>[]);
-    _GeminiRead? gemini;
-    if (_apiKey.isNotEmpty) {
-      try {
-        gemini = await _askGemini(await photo.readAsBytes());
-      } on Object {
-        gemini = null; // Offline or refused: the phone's reading will do.
-      }
-    }
+    final facts = _factsFromBarcode(photo.path);
+    final gemini = _apiKey.isEmpty
+        ? Future<_GeminiRead?>.value()
+        : photo
+              .readAsBytes()
+              .then(_askGemini)
+              // Offline or refused: the other readings will do.
+              .catchError((Object _) => null);
     final lines = await ocr;
+    final product = await facts;
+    final read = await gemini;
     final now = DateTime.now();
-    final ocrDate = parseExpiryDate(lines, now: now);
 
-    if (gemini != null && gemini.product.isNotEmpty) {
-      final catalog = kCatalogById[gemini.catalogId];
-      final date = _sane(gemini.expiry, now) ?? ocrDate;
-      return PackFound(
-        PackScan(
-          item: _item(
-            name: catalog?.name ?? _title(gemini.product),
-            catalog: catalog,
-            storage: gemini.storage,
-            spec: gemini.detail,
-            expiresAt: date,
-            now: now,
-          ),
-          dateRead: date != null,
-          byGemini: true,
-        ),
-      );
-    }
+    // What it is: the barcode's database entry is exact, Gemini reads the
+    // label, the phone's text is the last resort.
+    final catalog =
+        (product == null
+            ? null
+            : matchCatalog([
+                product.genericName,
+                product.name,
+                ...product.categories,
+              ])) ??
+        kCatalogById[read?.catalogId] ??
+        matchCatalog(lines);
+    final name =
+        catalog?.name ??
+        (product != null && product.name.isNotEmpty ? product.name : null) ??
+        (read != null && read.product.isNotEmpty ? _title(read.product) : null);
+    final date = _sane(read?.expiry, now) ?? parseExpiryDate(lines, now: now);
+    if (name == null && date == null) return PackUnknown(lines);
 
-    final catalog = matchCatalog(lines);
-    if (catalog == null && ocrDate == null) return PackUnknown(lines);
     return PackFound(
       PackScan(
         item: _item(
-          name: catalog?.name ?? 'Scanned item',
+          name: name ?? 'Scanned item',
           catalog: catalog,
-          expiresAt: ocrDate,
+          storage: read?.storage,
+          spec: product?.detail ?? read?.detail ?? '',
+          expiresAt: date,
           now: now,
         ),
-        dateRead: ocrDate != null,
-        byGemini: false,
+        dateRead: date != null,
+        byGemini: read != null,
+        byBarcode: product != null,
       ),
     );
   } on ScanException catch (e) {

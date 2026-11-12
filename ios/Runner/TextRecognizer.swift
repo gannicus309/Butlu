@@ -24,6 +24,10 @@ final class TextRecognizer: NSObject, FlutterPlugin {
       result(AVCaptureDevice.default(for: .video) != nil)
       return
     }
+    if call.method == "detectBarcodes", let path = call.arguments as? String {
+      detectBarcodes(path: path, result: result)
+      return
+    }
     guard call.method == "recognizeText",
           let path = call.arguments as? String
     else {
@@ -66,6 +70,30 @@ final class TextRecognizer: NSObject, FlutterPlugin {
         DispatchQueue.main.async {
           result(FlutterError(code: "vision", message: error.localizedDescription, details: nil))
         }
+      }
+    }
+  }
+}
+
+extension TextRecognizer {
+  /// Product barcodes (EAN/UPC) in a photo, as their digits.
+  func detectBarcodes(path: String, result: @escaping FlutterResult) {
+    guard let image = UIImage(contentsOfFile: path), let cgImage = image.cgImage else {
+      result([String]())
+      return
+    }
+    let request = VNDetectBarcodesRequest { request, _ in
+      let codes = (request.results as? [VNBarcodeObservation] ?? [])
+        .compactMap(\.payloadStringValue)
+      DispatchQueue.main.async { result(Array(NSOrderedSet(array: codes)) as? [String] ?? codes) }
+    }
+    request.symbologies = [.ean13, .ean8, .upce, .gs1DataBar, .gs1DataBarExpanded]
+    let orientation = CGImagePropertyOrientation(image.imageOrientation)
+    DispatchQueue.global(qos: .userInitiated).async {
+      do {
+        try VNImageRequestHandler(cgImage: cgImage, orientation: orientation).perform([request])
+      } catch {
+        DispatchQueue.main.async { result([String]()) }
       }
     }
   }

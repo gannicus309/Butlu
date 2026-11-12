@@ -90,3 +90,14 @@ Future<ScanResult?> scanExpiryDate({bool fromLibrary = false}) async {
     return ScanFailed(e.message);
   }
 }
+
+/// Product barcodes (EAN/UPC digits) Apple Vision finds in a photo; empty
+/// if none, or if detection failed.
+Future<List<String>> detectBarcodes(String path) async {
+  try {
+    return await _channel.invokeListMethod<String>('detectBarcodes', path) ??
+        const <String>[];
+  } on PlatformException {
+    return const <String>[];
+  }
+}

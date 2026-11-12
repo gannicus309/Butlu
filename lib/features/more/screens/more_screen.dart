@@ -36,6 +36,12 @@ class MoreScreen extends StatelessWidget {
             onTap: () => context.push('/more/gemini'),
           ),
           ListTile(
+            leading: const Icon(Icons.sticky_note_2_outlined),
+            title: const Text('Family notes'),
+            subtitle: const Text('What Gemini should know about you'),
+            onTap: () => context.push('/more/notes'),
+          ),
+          ListTile(
             leading: const Icon(Icons.lock_outline),
             title: const Text('Vault'),
             subtitle: const Text('Private notes, behind Face ID'),
