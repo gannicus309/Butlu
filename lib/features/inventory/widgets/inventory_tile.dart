@@ -30,10 +30,18 @@ String expiryLabel(int? daysLeft) {
 
 /// An inventory item as a tile: icon, name, and a days-left badge.
 class InventoryTile extends StatelessWidget {
-  const InventoryTile({super.key, required this.item, required this.onTap});
+  const InventoryTile({
+    super.key,
+    required this.item,
+    required this.onTap,
+    this.onLongPress,
+  });
 
   final InventoryItem item;
   final VoidCallback onTap;
+
+  /// Long-press: rename.
+  final VoidCallback? onLongPress;
 
   @override
   Widget build(BuildContext context) {
@@ -45,6 +53,7 @@ class InventoryTile extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
+        onLongPress: onLongPress,
         child: Stack(
           children: [
             Positioned.fill(

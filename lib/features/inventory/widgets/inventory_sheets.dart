@@ -16,6 +16,10 @@ class ItemSaved extends ItemSheetResult {
   final InventoryItem item;
 }
 
+/// Removed without counting as used up -- added by mistake, or thrown
+/// out.
+class ItemDeleted extends ItemSheetResult {}
+
 class ItemUsedUp extends ItemSheetResult {
   ItemUsedUp({required this.addToList});
 
@@ -132,6 +136,7 @@ Future<ItemSheetResult?> showInventoryItemSheet(
   var storage = item.storage;
   var expiresAt = item.expiresAt;
   final spec = TextEditingController(text: item.spec);
+  final name = TextEditingController(text: item.name);
   final today = DateTime.now();
   final base = DateTime(today.year, today.month, today.day);
 
@@ -160,9 +165,23 @@ Future<ItemSheetResult?> showInventoryItemSheet(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text(
-                '${item.emoji}  ${item.name}',
+              TextField(
+                controller: name,
+                textCapitalization: TextCapitalization.sentences,
                 style: Theme.of(context).textTheme.titleLarge,
+                decoration: InputDecoration(
+                  prefixIcon: Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: Text(
+                      item.emoji,
+                      style: const TextStyle(fontSize: 26),
+                    ),
+                  ),
+                  prefixIconConstraints: const BoxConstraints(),
+                  suffixIcon: const Icon(Icons.edit_outlined, size: 18),
+                  border: InputBorder.none,
+                  hintText: 'Name',
+                ),
               ),
               const SizedBox(height: 16),
               _StorageChips(
@@ -237,36 +256,67 @@ Future<ItemSheetResult?> showInventoryItemSheet(
               Row(
                 children: [
                   Expanded(
-                    child: OutlinedButton(
+                    child: FilledButton.icon(
+                      style: FilledButton.styleFrom(
+                        backgroundColor: const Color(0xFFE8710A),
+                        foregroundColor: Colors.white,
+                        minimumSize: const Size.fromHeight(48),
+                      ),
                       onPressed: () =>
                           Navigator.pop(context, ItemUsedUp(addToList: false)),
-                      child: const Text('Used up'),
+                      icon: const Icon(Icons.check_circle_outline),
+                      label: const Text('Used up'),
                     ),
                   ),
                   const SizedBox(width: 8),
                   Expanded(
-                    child: OutlinedButton(
+                    child: FilledButton.icon(
+                      style: FilledButton.styleFrom(
+                        backgroundColor: const Color(0xFF199E70),
+                        foregroundColor: Colors.white,
+                        minimumSize: const Size.fromHeight(48),
+                      ),
                       onPressed: () =>
                           Navigator.pop(context, ItemUsedUp(addToList: true)),
-                      child: const Text('Used up + buy'),
+                      icon: const Icon(Icons.add_shopping_cart),
+                      label: const Text('Used up + buy'),
                     ),
                   ),
                 ],
               ),
               const SizedBox(height: 8),
-              FilledButton(
-                onPressed: () => Navigator.pop(
-                  context,
-                  ItemSaved(
-                    item.copyWith(
-                      storage: storage,
-                      expiresAt: expiresAt,
-                      clearExpiry: expiresAt == null,
-                      spec: spec.text.trim(),
+              Row(
+                children: [
+                  TextButton.icon(
+                    style: TextButton.styleFrom(
+                      foregroundColor: Theme.of(context).colorScheme.error,
+                      visualDensity: VisualDensity.compact,
+                    ),
+                    onPressed: () => Navigator.pop(context, ItemDeleted()),
+                    icon: const Icon(Icons.delete_outline, size: 18),
+                    label: const Text('Delete'),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.pop(
+                        context,
+                        ItemSaved(
+                          item.copyWith(
+                            name: name.text.trim().isEmpty
+                                ? item.name
+                                : name.text.trim(),
+                            storage: storage,
+                            expiresAt: expiresAt,
+                            clearExpiry: expiresAt == null,
+                            spec: spec.text.trim(),
+                          ),
+                        ),
+                      ),
+                      child: const Text('Save'),
                     ),
                   ),
-                ),
-                child: const Text('Save'),
+                ],
               ),
             ],
           ),

@@ -42,13 +42,15 @@ class InventoryItem {
   }
 
   InventoryItem copyWith({
+    String? name,
     StorageLocation? storage,
     DateTime? expiresAt,
     bool clearExpiry = false,
     String? spec,
+    String? id,
   }) => InventoryItem(
-    id: id,
-    name: name,
+    id: id ?? this.id,
+    name: name ?? this.name,
     emoji: emoji,
     category: category,
     storage: storage ?? this.storage,

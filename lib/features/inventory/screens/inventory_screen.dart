@@ -208,20 +208,54 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
       catalogId: catalog?.id,
       expiresAt: estimatedExpiry(catalog, from: DateTime.now()),
     );
-    await ref.read(inventoryRepositoryProvider).addAll([item], uid: uid);
+    final id = await ref.read(inventoryRepositoryProvider).add(item, uid: uid);
     HapticFeedback.lightImpact();
     if (!mounted) return;
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(
-          persist: false,
-          content: Text(
-            '${item.emoji}  ${item.name} → ${item.storage.label}. '
-            'Tap it to set the exact date.',
+    _say(
+      '${item.emoji}  ${item.name} → ${item.storage.label}',
+      action: SnackBarAction(
+        label: 'Change',
+        onPressed: () => _open(item.copyWith(id: id)),
+      ),
+    );
+  }
+
+  /// Long-press on a tile.
+  Future<void> _rename(InventoryItem item) async {
+    HapticFeedback.selectionClick();
+    final controller = TextEditingController(text: item.name);
+    final name = await showDialog<String>(
+      context: context,
+      useRootNavigator: true,
+      builder: (context) => AlertDialog(
+        title: const Text('Rename'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          textCapitalization: TextCapitalization.sentences,
+          decoration: InputDecoration(
+            prefixText: '${item.emoji}  ',
+            hintText: 'Name',
           ),
+          onSubmitted: (v) => Navigator.pop(context, v),
         ),
-      );
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, controller.text),
+            child: const Text('Rename'),
+          ),
+        ],
+      ),
+    );
+    final trimmed = name?.trim() ?? '';
+    if (trimmed.isEmpty || trimmed == item.name) return;
+    await ref
+        .read(inventoryRepositoryProvider)
+        .update(item.copyWith(name: trimmed));
   }
 
   Future<void> _open(InventoryItem item) async {
@@ -230,6 +264,20 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
     switch (result) {
       case ItemSaved(:final item):
         await repo.update(item);
+      case ItemDeleted():
+        HapticFeedback.mediumImpact();
+        await repo.remove(item.id);
+        if (!mounted) return;
+        _say(
+          '${item.emoji}  ${item.name} deleted',
+          action: SnackBarAction(
+            label: 'Undo',
+            onPressed: () {
+              final uid = _uid;
+              if (uid != null) repo.add(item, uid: uid);
+            },
+          ),
+        );
       case ItemUsedUp(:final addToList):
         HapticFeedback.mediumImpact();
         await repo.remove(item.id);
@@ -287,7 +335,12 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
         gridDelegate: _grid,
         delegate: SliverChildListDelegate([
           for (final i in list)
-            InventoryTile(key: ValueKey(i.id), item: i, onTap: () => _open(i)),
+            InventoryTile(
+              key: ValueKey(i.id),
+              item: i,
+              onTap: () => _open(i),
+              onLongPress: () => _rename(i),
+            ),
         ]),
       ),
     );
