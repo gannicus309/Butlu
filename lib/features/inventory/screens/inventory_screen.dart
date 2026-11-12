@@ -24,8 +24,8 @@ class InventoryScreen extends ConsumerStatefulWidget {
 }
 
 class _InventoryScreenState extends ConsumerState<InventoryScreen> {
-  /// Null shows everything.
-  StorageLocation? _filter;
+  /// Null shows everything, in a section per group.
+  FoodGroup? _filter;
 
   static const _grid = SliverGridDelegateWithMaxCrossAxisExtent(
     maxCrossAxisExtent: 140,
@@ -265,6 +265,27 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
     switch (result) {
       case ItemSaved(:final item):
         await repo.update(item);
+      case ItemRunningLow(:final item):
+        HapticFeedback.mediumImpact();
+        await repo.update(item);
+        final uid = _uid;
+        final onList = ref
+            .read(shoppingListProvider)
+            .value
+            ?.any((s) => s.name.toLowerCase() == item.name.toLowerCase());
+        if (uid != null && onList != true) {
+          final catalog = kCatalogById[item.catalogId];
+          await ref
+              .read(shoppingRepositoryProvider)
+              .add(
+                catalog != null
+                    ? ShoppingItem.fromCatalog(catalog)
+                    : ShoppingItem.custom(item.name),
+                uid: uid,
+              );
+        }
+        if (!mounted) return;
+        _say('${item.emoji}  ${item.name} is on the shopping list');
       case ItemDeleted():
         HapticFeedback.mediumImpact();
         await repo.remove(item.id);
@@ -320,15 +341,29 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
     final all = itemsAsync.value ?? const <InventoryItem>[];
     final items = _filter == null
         ? all
-        : all.where((i) => i.storage == _filter).toList();
+        : all.where((i) => i.group == _filter).toList();
+    // Food going off soon comes first, whatever its group; household
+    // supplies have no dates.
+    bool soonish(InventoryItem i) =>
+        i.group != FoodGroup.household && (i.daysLeft() ?? 99) <= 2;
     final soon = [
       for (final i in items)
-        if ((i.daysLeft() ?? 99) <= 2) i,
+        if (soonish(i)) i,
     ];
-    final rest = [
-      for (final i in items)
-        if ((i.daysLeft() ?? 99) > 2) i,
-    ];
+    final byGroup = {
+      for (final g in FoodGroup.values)
+        g:
+            [
+              for (final i in items)
+                if (i.group == g && !soonish(i)) i,
+            ]..sort((a, b) {
+              // Running-low supplies first, then soonest use-by date.
+              if (a.low != b.low) return a.low ? -1 : 1;
+              return (a.expiresAt ?? DateTime(9999)).compareTo(
+                b.expiresAt ?? DateTime(9999),
+              );
+            }),
+    };
 
     Widget grid(List<InventoryItem> list) => SliverPadding(
       padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -390,26 +425,20 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
               padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
               child: Row(
                 children: [
-                  for (final s in <StorageLocation?>[
-                    null,
-                    StorageLocation.fridge,
-                    StorageLocation.freezer,
-                    StorageLocation.pantry,
-                    StorageLocation.household,
-                  ])
+                  for (final g in <FoodGroup?>[null, ...FoodGroup.values])
                     Padding(
                       padding: const EdgeInsets.only(right: 8),
                       child: ChoiceChip(
                         label: Text(
-                          s == null
+                          g == null
                               ? 'All · ${all.length}'
-                              : '${s.emoji} ${s.label} · '
-                                    '${all.where((i) => i.storage == s).length}',
+                              : '${g.emoji} ${g.label} · '
+                                    '${all.where((i) => i.group == g).length}',
                         ),
-                        selected: _filter == s,
+                        selected: _filter == g,
                         onSelected: (_) {
                           HapticFeedback.selectionClick();
-                          setState(() => _filter = s);
+                          setState(() => _filter = g);
                         },
                       ),
                     ),
@@ -433,11 +462,16 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
               ),
             )
           else ...[
-            if (soon.isNotEmpty) ...[header('Use soon'), grid(soon)],
-            if (rest.isNotEmpty) ...[
-              header(soon.isEmpty ? 'Everything' : 'Later'),
-              grid(rest),
-            ],
+            if (soon.isNotEmpty) ...[header('⏰ Use soon'), grid(soon)],
+            for (final MapEntry(key: g, value: list) in byGroup.entries)
+              if (list.isNotEmpty) ...[
+                header(
+                  g == FoodGroup.household
+                      ? '${g.emoji} ${g.label} supplies'
+                      : '${g.emoji} ${g.label}',
+                ),
+                grid(list),
+              ],
           ],
           const SliverToBoxAdapter(child: SizedBox(height: 96)),
         ],

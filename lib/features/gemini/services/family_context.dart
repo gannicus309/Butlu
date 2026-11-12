@@ -84,7 +84,10 @@ Future<String> buildFamilyContext(WidgetRef ref) async {
 
   b
     ..writeln()
-    ..writeln('INVENTORY (${inventory.length} items: fridge/freezer/pantry):');
+    ..writeln(
+      'INVENTORY (${inventory.length} items; groups: protein, carbs, other '
+      'food, household supplies):',
+    );
   final byExpiry = [...inventory]
     ..sort(
       (a, c) => (a.expiresAt ?? DateTime(9999)).compareTo(
@@ -95,7 +98,7 @@ Future<String> buildFamilyContext(WidgetRef ref) async {
     final left = i.daysLeft(now);
     b.writeln(
       '- ${i.name}${i.spec.isEmpty ? '' : ' (${i.spec})'} · '
-      '${i.storage.label}'
+      '${i.group.label}${i.low ? ' (running low)' : ''} · ${i.storage.label}'
       '${i.expiresAt == null ? '' : ' · use by ${day.format(i.expiresAt!)}'
                 ' (${left! < 0 ? '${-left} days past' : '$left days left'})'}',
     );

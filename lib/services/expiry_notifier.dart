@@ -4,7 +4,6 @@ import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:timezone/data/latest.dart' as tzdata;
 import 'package:timezone/timezone.dart' as tz;
 
-import '../features/grocery/models/catalog.dart';
 import '../features/inventory/models/inventory_item.dart';
 
 /// Reminders, scheduled with iOS, that pantry items are about to go off --
@@ -51,7 +50,7 @@ class ExpiryNotifier {
     final byDay = <int, List<InventoryItem>>{};
     for (final item in items) {
       final e = item.expiresAt;
-      if (e == null || item.storage == StorageLocation.household) continue;
+      if (e == null || item.group == FoodGroup.household) continue;
       final expiryDay = tz.TZDateTime(tz.local, e.year, e.month, e.day);
       final offset = expiryDay.difference(today).inDays - 1;
       if (offset < 0 || offset >= _days) continue;

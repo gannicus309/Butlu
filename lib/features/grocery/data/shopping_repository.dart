@@ -73,6 +73,19 @@ class ShoppingRepository {
         'lastBoughtAt': FieldValue.serverTimestamp(),
         'timesBought': FieldValue.increment(1),
       }, SetOptions(merge: true));
+    // Bought a supply that was running low: it's stocked again.
+    final low = await _family
+        .collection('inventory')
+        .where('low', isEqualTo: true)
+        .get();
+    for (final doc in low.docs) {
+      final name = (doc.data()['name'] as String? ?? '').toLowerCase();
+      if (name == item.name.toLowerCase() ||
+          (item.catalogItem != null &&
+              doc.data()['catalogId'] == item.catalogItem!.id)) {
+        batch.update(doc.reference, {'low': false});
+      }
+    }
     await batch.commit();
   }
 

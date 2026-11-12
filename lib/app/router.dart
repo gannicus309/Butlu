@@ -35,6 +35,14 @@ final GoRouter appRouter = GoRouter(
       parentNavigatorKey: _rootNavigatorKey,
       builder: (context, state) => const AccountScreen(),
     ),
+    // Ask Gemini from any tab (the ✨ button next to the profile picture),
+    // full screen above the tab bar. `?q=` asks a question straight away.
+    GoRoute(
+      path: '/ask',
+      parentNavigatorKey: _rootNavigatorKey,
+      builder: (context, state) =>
+          GeminiChatScreen(initialPrompt: state.uri.queryParameters['q']),
+    ),
     StatefulShellRoute.indexedStack(
       builder: (context, state, navigationShell) =>
           _AppShell(navigationShell: navigationShell),

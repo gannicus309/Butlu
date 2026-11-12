@@ -12,6 +12,8 @@ class InventoryItem {
     this.spec = '',
     this.expiresAt,
     this.addedAt,
+    this.groupOverride,
+    this.low = false,
   });
 
   final String id;
@@ -32,6 +34,22 @@ class InventoryItem {
   final DateTime? expiresAt;
   final DateTime? addedAt;
 
+  /// Set when someone moved it to another group by hand; otherwise the
+  /// group is worked out from what it is ([group]).
+  final FoodGroup? groupOverride;
+
+  /// Household supplies: marked as running low (and put on the list).
+  final bool low;
+
+  FoodGroup get group =>
+      groupOverride ??
+      foodGroupFor(
+        catalogId: catalogId,
+        category: category,
+        storage: storage,
+        name: name,
+      );
+
   /// Whole days until [expiresAt] from today; negative once past it.
   int? daysLeft([DateTime? now]) {
     final e = expiresAt;
@@ -42,6 +60,8 @@ class InventoryItem {
   }
 
   InventoryItem copyWith({
+    FoodGroup? group,
+    bool? low,
     String? name,
     StorageLocation? storage,
     DateTime? expiresAt,
@@ -58,6 +78,8 @@ class InventoryItem {
     spec: spec ?? this.spec,
     expiresAt: clearExpiry ? null : (expiresAt ?? this.expiresAt),
     addedAt: addedAt,
+    groupOverride: group ?? groupOverride,
+    low: low ?? this.low,
   );
 }
 
@@ -94,4 +116,166 @@ extension StorageLabel on StorageLocation {
     StorageLocation.pantry => '🥫',
     StorageLocation.household => '🧴',
   };
+}
+
+/// How the inventory is split up: what it's for, not where it's kept.
+enum FoodGroup {
+  protein('Protein', '🥩'),
+  carbs('Carbs', '🍞'),
+  other('Other food', '🥦'),
+
+  /// Cleaning things, toiletries and other supplies: no use-by date, just
+  /// "have it" or "running low".
+  household('Household', '🧴');
+
+  const FoodGroup(this.label, this.emoji);
+  final String label;
+  final String emoji;
+}
+
+const _protein = {
+  'eggs',
+  'cheese',
+  'sliced-cheese',
+  'mozzarella',
+  'feta',
+  'paneer',
+  'yogurt',
+  'quark',
+  'milk',
+  'lentils',
+  'chickpeas',
+  'beans',
+  'nuts',
+  'peanut-butter',
+  'fish-fingers',
+  'tofu',
+};
+const _carbs = {
+  'rice',
+  'pasta',
+  'noodles',
+  'flour',
+  'oats',
+  'cereal',
+  'potatoes',
+  'sweet-potatoes',
+  'fries',
+  'pizza',
+  'corn',
+  'sugar',
+};
+const _proteinWords = [
+  'chicken',
+  'hähnchen',
+  'huhn',
+  'beef',
+  'rind',
+  'pork',
+  'schwein',
+  'lamb',
+  'fish',
+  'fisch',
+  'lachs',
+  'salmon',
+  'tuna',
+  'thunfisch',
+  'egg',
+  'eier',
+  'tofu',
+  'tempeh',
+  'paneer',
+  'cheese',
+  'käse',
+  'quark',
+  'yogurt',
+  'joghurt',
+  'skyr',
+  'lentil',
+  'linsen',
+  'dal',
+  'chickpea',
+  'kichererbsen',
+  'bean',
+  'bohnen',
+  'prawn',
+  'garnelen',
+  'mince',
+  'hack',
+  'sausage',
+  'wurst',
+  'ham',
+  'schinken',
+  'protein',
+  'whey',
+  'milk',
+  'milch',
+];
+const _carbWords = [
+  'bread',
+  'brot',
+  'toast',
+  'roll',
+  'brötchen',
+  'rice',
+  'reis',
+  'pasta',
+  'nudel',
+  'spaghetti',
+  'noodle',
+  'flour',
+  'mehl',
+  'oat',
+  'hafer',
+  'cereal',
+  'müsli',
+  'muesli',
+  'potato',
+  'kartoffel',
+  'couscous',
+  'quinoa',
+  'bulgur',
+  'wrap',
+  'tortilla',
+  'naan',
+  'bagel',
+  'croissant',
+  'pizza',
+  'fries',
+  'pommes',
+  'gnocchi',
+  'semolina',
+  'grieß',
+  'atta',
+  'poha',
+  'idli',
+  'dosa',
+];
+
+/// The group an item belongs in, from its catalog entry when it has one,
+/// otherwise from its name.
+FoodGroup foodGroupFor({
+  required String? catalogId,
+  required GroceryCategory category,
+  required StorageLocation storage,
+  required String name,
+}) {
+  if (category == GroceryCategory.household ||
+      category == GroceryCategory.personal ||
+      storage == StorageLocation.household) {
+    return FoodGroup.household;
+  }
+  if (catalogId != null) {
+    if (_protein.contains(catalogId)) return FoodGroup.protein;
+    if (_carbs.contains(catalogId)) return FoodGroup.carbs;
+    if (category == GroceryCategory.meatFish) return FoodGroup.protein;
+    if (category == GroceryCategory.bakery) return FoodGroup.carbs;
+    return FoodGroup.other;
+  }
+  if (category == GroceryCategory.meatFish) return FoodGroup.protein;
+  if (category == GroceryCategory.bakery) return FoodGroup.carbs;
+  final n = name.toLowerCase();
+  if (_proteinWords.any(n.contains)) return FoodGroup.protein;
+  if (_carbWords.any(n.contains)) return FoodGroup.carbs;
+  return FoodGroup.other;
 }

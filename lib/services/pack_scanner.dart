@@ -1,7 +1,5 @@
-import 'dart:convert';
 import 'dart:typed_data';
 
-import 'package:google_generative_ai/google_generative_ai.dart';
 import 'package:intl/intl.dart';
 
 import '../features/grocery/models/catalog.dart';
@@ -9,6 +7,7 @@ import '../features/inventory/models/expiry_parser.dart';
 import '../features/inventory/models/inventory_item.dart';
 import 'expiry_scanner.dart';
 import 'food_facts.dart';
+import 'gemini_client.dart';
 
 /// What one photo of a pack says: the product, and its date if one could
 /// be read.
@@ -64,8 +63,7 @@ class PackFailed extends PackScanResult {
   final String message;
 }
 
-const _apiKey = String.fromEnvironment('GEMINI_API_KEY');
-const _model = 'gemini-3.6-flash';
+final _gemini = GeminiClient();
 
 /// Takes a photo of a product and works out what it is and when it goes
 /// off, so it can go straight into the inventory.
@@ -92,7 +90,7 @@ Future<PackScanResult?> scanPack({
     // All three at once: text and barcodes on the phone, Gemini online.
     final ocr = recognizeText(photo.path).catchError((_) => <String>[]);
     final facts = _factsFromBarcode(photo.path);
-    final gemini = _apiKey.isEmpty
+    final gemini = !_gemini.hasKey
         ? Future<_GeminiRead?>.value()
         : photo
               .readAsBytes()
@@ -221,14 +219,6 @@ class _GeminiRead {
 }
 
 Future<_GeminiRead?> _askGemini(Uint8List jpeg) async {
-  final model = GenerativeModel(
-    model: _model,
-    apiKey: _apiKey,
-    generationConfig: GenerationConfig(
-      responseMimeType: 'application/json',
-      temperature: 0,
-    ),
-  );
   final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
   final catalog = [
     for (final c in kCatalog) '${c.id}: ${[c.name, ...c.aliases].join(' / ')}',
@@ -255,15 +245,8 @@ Answer with JSON only:
 
 Catalog (id: names):
 $catalog''';
-  final response = await model
-      .generateContent([
-        Content.multi([TextPart(prompt), DataPart('image/jpeg', jpeg)]),
-      ])
-      .timeout(const Duration(seconds: 25));
-  final text = response.text;
-  if (text == null) return null;
-  final json = jsonDecode(text);
-  if (json is! Map) return null;
+  final json = await _gemini.json(prompt, jpeg: jpeg);
+  if (json == null) return null;
   final expiry = json['expiry'];
   return _GeminiRead(
     product: '${json['product'] ?? ''}'.trim(),

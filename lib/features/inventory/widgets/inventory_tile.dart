@@ -45,8 +45,11 @@ class InventoryTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final supply = item.group == FoodGroup.household;
     final days = item.daysLeft();
-    final badge = expiryColor(days);
+    final badge = supply
+        ? (item.low ? const Color(0xFFFFB74D) : Colors.white24)
+        : expiryColor(days);
     return Material(
       color: storageColor(item.storage),
       borderRadius: BorderRadius.circular(14),
@@ -106,9 +109,11 @@ class InventoryTile extends StatelessWidget {
                   borderRadius: BorderRadius.circular(999),
                 ),
                 child: Text(
-                  expiryLabel(days),
+                  supply ? (item.low ? 'Low' : 'Have') : expiryLabel(days),
                   style: TextStyle(
-                    color: days == null ? Colors.white : Colors.black,
+                    color: (supply ? !item.low : days == null)
+                        ? Colors.white
+                        : Colors.black,
                     fontSize: 10.5,
                     fontWeight: FontWeight.w700,
                   ),

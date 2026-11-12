@@ -33,7 +33,7 @@ class MoreScreen extends StatelessWidget {
           ListTile(
             leading: const Icon(Icons.chat_bubble_outline),
             title: const Text('Ask Gemini'),
-            onTap: () => context.push('/more/gemini'),
+            onTap: () => context.push('/ask'),
           ),
           ListTile(
             leading: const Icon(Icons.sticky_note_2_outlined),

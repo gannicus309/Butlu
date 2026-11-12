@@ -94,6 +94,8 @@ class InventoryRepository {
         ? null
         : Timestamp.fromDate(item.expiresAt!),
     'addedAt': FieldValue.serverTimestamp(),
+    'group': item.groupOverride?.name,
+    'low': item.low,
   };
 
   static InventoryItem _from(QueryDocumentSnapshot<Map<String, dynamic>> d) {
@@ -113,6 +115,8 @@ class InventoryRepository {
       spec: data['spec'] as String? ?? '',
       expiresAt: date(data['expiresAt']),
       addedAt: date(data['addedAt']),
+      groupOverride: FoodGroup.values.asNameMap()[data['group']],
+      low: data['low'] as bool? ?? false,
     );
   }
 }

@@ -20,6 +20,13 @@ class ItemSaved extends ItemSheetResult {
 /// out.
 class ItemDeleted extends ItemSheetResult {}
 
+/// A household supply is running low: keep it, mark it, add it to the
+/// shopping list.
+class ItemRunningLow extends ItemSheetResult {
+  ItemRunningLow(this.item);
+  final InventoryItem item;
+}
+
 class ItemUsedUp extends ItemSheetResult {
   ItemUsedUp({required this.addToList});
 
@@ -135,6 +142,7 @@ Future<ItemSheetResult?> showInventoryItemSheet(
 ) {
   var storage = item.storage;
   var expiresAt = item.expiresAt;
+  var group = item.group;
   final spec = TextEditingController(text: item.spec);
   final name = TextEditingController(text: item.name);
   final today = DateTime.now();
@@ -184,66 +192,89 @@ Future<ItemSheetResult?> showInventoryItemSheet(
                 ),
               ),
               const SizedBox(height: 16),
-              _StorageChips(
-                value: storage,
-                onChanged: (s) => setState(() => storage = s),
-              ),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: expiryColor(days),
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                    child: Text(
-                      expiresAt == null
-                          ? 'No date'
-                          : 'Use by ${DateFormat.MMMEd().format(expiresAt!)}',
-                      style: TextStyle(
-                        color: days == null ? Colors.white : Colors.black,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                  const Spacer(),
-                  ScanDateButton(onDate: (d) => setState(() => expiresAt = d)),
-                  TextButton(
-                    onPressed: () async {
-                      final d = await _pickDate(context, expiresAt);
-                      if (d != null) setState(() => expiresAt = d);
-                    },
-                    child: const Text('Pick date'),
-                  ),
-                ],
-              ),
               Wrap(
                 spacing: 8,
                 children: [
-                  for (final (label, add) in const [
-                    ('+1 day', 1),
-                    ('+3 days', 3),
-                    ('+1 week', 7),
-                    ('+1 month', 30),
-                  ])
-                    ActionChip(
-                      label: Text(label),
-                      onPressed: () => setState(
-                        () => expiresAt = (expiresAt ?? base).add(
-                          Duration(days: add),
+                  for (final g in FoodGroup.values)
+                    ChoiceChip(
+                      label: Text('${g.emoji} ${g.label}'),
+                      selected: g == group,
+                      onSelected: (_) => setState(() => group = g),
+                    ),
+                ],
+              ),
+              if (group != FoodGroup.household) ...[
+                const SizedBox(height: 12),
+                _StorageChips(
+                  value: storage,
+                  onChanged: (s) => setState(() => storage = s),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: expiryColor(days),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Text(
+                        expiresAt == null
+                            ? 'No date'
+                            : 'Use by ${DateFormat.MMMEd().format(expiresAt!)}',
+                        style: TextStyle(
+                          color: days == null ? Colors.white : Colors.black,
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
                     ),
-                  ActionChip(
-                    label: const Text('No date'),
-                    onPressed: () => setState(() => expiresAt = null),
-                  ),
-                ],
-              ),
+                    const Spacer(),
+                    ScanDateButton(
+                      onDate: (d) => setState(() => expiresAt = d),
+                    ),
+                    TextButton(
+                      onPressed: () async {
+                        final d = await _pickDate(context, expiresAt);
+                        if (d != null) setState(() => expiresAt = d);
+                      },
+                      child: const Text('Pick date'),
+                    ),
+                  ],
+                ),
+                Wrap(
+                  spacing: 8,
+                  children: [
+                    for (final (label, add) in const [
+                      ('+1 day', 1),
+                      ('+3 days', 3),
+                      ('+1 week', 7),
+                      ('+1 month', 30),
+                    ])
+                      ActionChip(
+                        label: Text(label),
+                        onPressed: () => setState(
+                          () => expiresAt = (expiresAt ?? base).add(
+                            Duration(days: add),
+                          ),
+                        ),
+                      ),
+                    ActionChip(
+                      label: const Text('No date'),
+                      onPressed: () => setState(() => expiresAt = null),
+                    ),
+                  ],
+                ),
+              ] else ...[
+                const SizedBox(height: 12),
+                Text(
+                  'Supplies have no use-by date. Mark them as running low '
+                  'and they go on the shopping list.',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ],
               const SizedBox(height: 12),
               TextField(
                 controller: spec,
@@ -253,6 +284,26 @@ Future<ItemSheetResult?> showInventoryItemSheet(
                 ),
               ),
               const SizedBox(height: 20),
+              if (group == FoodGroup.household) ...[
+                FilledButton.icon(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xFFFFB74D),
+                    foregroundColor: Colors.black,
+                    minimumSize: const Size.fromHeight(48),
+                  ),
+                  onPressed: () => Navigator.pop(
+                    context,
+                    ItemRunningLow(item.copyWith(group: group, low: true)),
+                  ),
+                  icon: const Icon(Icons.battery_2_bar),
+                  label: Text(
+                    item.low
+                        ? 'Running low · already on the list'
+                        : 'Running low · add to list',
+                  ),
+                ),
+                const SizedBox(height: 8),
+              ],
               Row(
                 children: [
                   Expanded(
@@ -303,12 +354,17 @@ Future<ItemSheetResult?> showInventoryItemSheet(
                         context,
                         ItemSaved(
                           item.copyWith(
+                            group: group,
                             name: name.text.trim().isEmpty
                                 ? item.name
                                 : name.text.trim(),
                             storage: storage,
-                            expiresAt: expiresAt,
-                            clearExpiry: expiresAt == null,
+                            expiresAt: group == FoodGroup.household
+                                ? null
+                                : expiresAt,
+                            clearExpiry:
+                                group == FoodGroup.household ||
+                                expiresAt == null,
                             spec: spec.text.trim(),
                           ),
                         ),
