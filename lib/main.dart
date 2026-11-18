@@ -17,6 +17,7 @@ import 'features/inventory/providers/inventory_providers.dart';
 import 'services/clash_notifier.dart';
 import 'services/expiry_notifier.dart';
 import 'services/signing_expiry_notifier.dart';
+import 'services/update_notifier.dart';
 import 'shared/widgets/butlu_logo.dart';
 
 Future<void> main() async {
@@ -33,6 +34,7 @@ Future<void> main() async {
   await expiryNotifier.init();
   // Not awaited: a notification plan shouldn't hold up the first frame.
   SigningExpiryNotifier().schedule();
+  UpdateNotifier(prefs).announceIfNew();
   runApp(
     ProviderScope(
       overrides: [

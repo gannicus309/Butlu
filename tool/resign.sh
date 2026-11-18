@@ -121,6 +121,11 @@ for entry in "${todo[@]}"; do
   if xcrun devicectl device install app --device "$udid" "$APP" >/dev/null 2>&1; then
     print "$expires" >"$STATE/expires-$udid"
     log "Installed on $name, good until $until_text"
+    # Start Butlu quietly in the background, so it can say "Butlu
+    # updated" right away. Fails harmlessly on a locked phone; it then
+    # says so the next time it's opened.
+    xcrun devicectl device process launch --device "$udid" --no-activate \
+      "$BUNDLE_ID" >/dev/null 2>&1 || true
     ok+=("$name")
   else
     # Forget its date so the next run tries this phone again.
